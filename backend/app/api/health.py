@@ -1,4 +1,6 @@
 """Health check endpoint - public, no auth required."""
+import os
+from flask import current_app
 from flask.views import MethodView
 from flask_smorest import Blueprint
 from sqlalchemy import text
@@ -22,7 +24,7 @@ class HealthCheck(MethodView):
         """Check API and database health.
         
         Returns:
-            Health status including database connectivity
+            Health status including database connectivity, version, and environment
         """
         # Check database connectivity
         db_status = 'connected'
@@ -34,5 +36,6 @@ class HealthCheck(MethodView):
         return {
             'status': 'ok',
             'database': db_status,
-            'version': '0.1.0'
+            'version': current_app.config.get('API_VERSION', '0.1.0'),
+            'environment': current_app.config.get('ENV', os.getenv('ENV', 'development'))
         }

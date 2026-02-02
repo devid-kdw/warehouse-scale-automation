@@ -59,6 +59,23 @@ class AppError(Exception):
         super().__init__(self.message)
 
 
+class InsufficientStockError(AppError):
+    """Raised when stock is insufficient for the requested operation."""
+    
+    def __init__(self, required: float, available: float, available_surplus: float = 0):
+        details = {
+            'required_kg': required,
+            'available_stock_kg': available,
+            'available_surplus_kg': available_surplus,
+            'shortage_kg': round(required - available - available_surplus, 2)
+        }
+        super().__init__(
+            code='INSUFFICIENT_STOCK',
+            message=f'Insufficient inventory: required {required}kg, available {available + available_surplus}kg (stock: {available}kg, surplus: {available_surplus}kg)',
+            details=details
+        )
+
+
 def register_error_handlers(app):
     """Register error handlers on Flask app."""
     

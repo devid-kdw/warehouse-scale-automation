@@ -5,6 +5,7 @@ from flask_smorest import Blueprint
 from ..extensions import db
 from ..auth import require_token
 from ..models import Batch, Article
+from ..services.validation import validate_batch_code
 from ..schemas.batches import BatchSchema, BatchCreateSchema, BatchListSchema
 from ..schemas.common import ErrorResponseSchema
 
@@ -69,6 +70,17 @@ class BatchList(MethodView):
         Creates a batch for the specified article.
         Batch code must be 4 digits (Mankiewicz) or 9-10 digits (Akzo).
         """
+        # Validate batch code format using service
+        batch_code = batch_data['batch_code']
+        if not validate_batch_code(batch_code):
+            return {
+                'error': {
+                    'code': 'INVALID_BATCH_FORMAT',
+                    'message': f'Invalid batch code format: {batch_code}. Must be 4 digits (Mankiewicz) or 9-10 digits (Akzo)',
+                    'details': {'batch_code': batch_code}
+                }
+            }, 400
+        
         # Check article exists
         article = Article.query.get(batch_data['article_id'])
         if not article:
@@ -83,14 +95,14 @@ class BatchList(MethodView):
         # Check if batch already exists for this article
         existing = Batch.query.filter_by(
             article_id=batch_data['article_id'],
-            batch_code=batch_data['batch_code']
+            batch_code=batch_code
         ).first()
         if existing:
             return {
                 'error': {
                     'code': 'VALIDATION_ERROR',
-                    'message': f"Batch {batch_data['batch_code']} already exists for this article",
-                    'details': {'batch_code': batch_data['batch_code']}
+                    'message': f'Batch {batch_code} already exists for this article',
+                    'details': {'batch_code': batch_code}
                 }
             }, 409
         

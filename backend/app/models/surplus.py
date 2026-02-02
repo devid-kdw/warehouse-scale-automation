@@ -40,7 +40,11 @@ class Surplus(db.Model):
         default=lambda: datetime.now(timezone.utc),
         nullable=False
     )
-    updated_at = db.Column(db.DateTime(timezone=True), nullable=True)
+    updated_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=True,
+        onupdate=lambda: datetime.now(timezone.utc)
+    )
     
     # Constraints
     __table_args__ = (

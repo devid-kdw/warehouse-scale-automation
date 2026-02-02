@@ -4,7 +4,8 @@ from flask_smorest import Blueprint
 
 from ..extensions import db
 from ..auth import require_token
-from ..models import WeighInDraft, ApprovalAction, User
+from ..services.approval_service import approve_draft, reject_draft
+from ..error_handling import AppError, InsufficientStockError
 from ..schemas.approvals import ApprovalRequestSchema, ApprovalResponseSchema
 from ..schemas.common import ErrorResponseSchema
 
@@ -26,67 +27,55 @@ class ApproveDraft(MethodView):
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Draft or user not found')
-    @blp.alt_response(409, schema=ErrorResponseSchema, description='Draft not in DRAFT status')
+    @blp.alt_response(409, schema=ErrorResponseSchema, description='Draft not in DRAFT status or insufficient stock')
     @require_token
     def post(self, approval_data, draft_id):
-        """Approve a draft.
+        """Approve a draft with atomic inventory update.
         
-        Only drafts in DRAFT status can be approved.
-        This is a stub - full implementation will update stock/surplus.
+        Applies surplus-first consumption logic:
+        1. Uses available surplus first
+        2. Then consumes from stock
+        3. Fails if combined inventory is insufficient
+        
+        Creates transaction records for audit trail.
         """
-        # Lock draft for update
-        draft = db.session.query(WeighInDraft).filter_by(id=draft_id).with_for_update().first()
-        if not draft:
+        try:
+            result = approve_draft(
+                draft_id=draft_id,
+                actor_user_id=approval_data['actor_user_id'],
+                note=approval_data.get('note')
+            )
+            db.session.commit()
+            
+            return {
+                'message': 'Draft approved successfully',
+                'draft_id': result['draft_id'],
+                'new_status': result['new_status'],
+                'consumed_surplus_kg': result['consumed_surplus_kg'],
+                'consumed_stock_kg': result['consumed_stock_kg'],
+                'action': result['approval_action']
+            }
+            
+        except InsufficientStockError as e:
+            db.session.rollback()
             return {
                 'error': {
-                    'code': 'DRAFT_NOT_FOUND',
-                    'message': f'Draft {draft_id} not found',
-                    'details': {}
-                }
-            }, 404
-        
-        if draft.status != 'DRAFT':
-            return {
-                'error': {
-                    'code': 'DRAFT_NOT_DRAFT',
-                    'message': f'Cannot approve draft with status {draft.status}',
-                    'details': {'current_status': draft.status}
+                    'code': e.code,
+                    'message': e.message,
+                    'details': e.details
                 }
             }, 409
-        
-        # Validate actor user exists
-        user = User.query.get(approval_data['actor_user_id'])
-        if not user:
+            
+        except AppError as e:
+            db.session.rollback()
+            status_code = 404 if 'NOT_FOUND' in e.code else 409
             return {
                 'error': {
-                    'code': 'USER_NOT_FOUND',
-                    'message': f"User ID {approval_data['actor_user_id']} not found",
-                    'details': {}
+                    'code': e.code,
+                    'message': e.message,
+                    'details': e.details
                 }
-            }, 404
-        
-        # Create approval action
-        action = ApprovalAction(
-            draft_id=draft_id,
-            action='APPROVE',
-            actor_user_id=approval_data['actor_user_id'],
-            old_value={'status': draft.status},
-            new_value={'status': 'APPROVED'},
-            note=approval_data.get('note')
-        )
-        
-        # Update draft status
-        draft.status = 'APPROVED'
-        
-        db.session.add(action)
-        db.session.commit()
-        
-        return {
-            'message': 'Draft approved successfully',
-            'draft_id': draft_id,
-            'new_status': 'APPROVED',
-            'action': action.to_dict()
-        }
+            }, status_code
 
 
 @blp.route('/<int:draft_id>/reject')
@@ -104,58 +93,30 @@ class RejectDraft(MethodView):
     def post(self, approval_data, draft_id):
         """Reject a draft.
         
-        Only drafts in DRAFT status can be rejected.
+        No inventory changes occur on rejection.
         """
-        # Lock draft for update
-        draft = db.session.query(WeighInDraft).filter_by(id=draft_id).with_for_update().first()
-        if not draft:
+        try:
+            result = reject_draft(
+                draft_id=draft_id,
+                actor_user_id=approval_data['actor_user_id'],
+                note=approval_data.get('note')
+            )
+            db.session.commit()
+            
+            return {
+                'message': 'Draft rejected successfully',
+                'draft_id': result['draft_id'],
+                'new_status': result['new_status'],
+                'action': result['approval_action']
+            }
+            
+        except AppError as e:
+            db.session.rollback()
+            status_code = 404 if 'NOT_FOUND' in e.code else 409
             return {
                 'error': {
-                    'code': 'DRAFT_NOT_FOUND',
-                    'message': f'Draft {draft_id} not found',
-                    'details': {}
+                    'code': e.code,
+                    'message': e.message,
+                    'details': e.details
                 }
-            }, 404
-        
-        if draft.status != 'DRAFT':
-            return {
-                'error': {
-                    'code': 'DRAFT_NOT_DRAFT',
-                    'message': f'Cannot reject draft with status {draft.status}',
-                    'details': {'current_status': draft.status}
-                }
-            }, 409
-        
-        # Validate actor user exists
-        user = User.query.get(approval_data['actor_user_id'])
-        if not user:
-            return {
-                'error': {
-                    'code': 'USER_NOT_FOUND',
-                    'message': f"User ID {approval_data['actor_user_id']} not found",
-                    'details': {}
-                }
-            }, 404
-        
-        # Create approval action
-        action = ApprovalAction(
-            draft_id=draft_id,
-            action='REJECT',
-            actor_user_id=approval_data['actor_user_id'],
-            old_value={'status': draft.status},
-            new_value={'status': 'REJECTED'},
-            note=approval_data.get('note')
-        )
-        
-        # Update draft status
-        draft.status = 'REJECTED'
-        
-        db.session.add(action)
-        db.session.commit()
-        
-        return {
-            'message': 'Draft rejected successfully',
-            'draft_id': draft_id,
-            'new_status': 'REJECTED',
-            'action': action.to_dict()
-        }
+            }, status_code

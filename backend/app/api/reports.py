@@ -1,9 +1,11 @@
-"""Reports API endpoints (stubs)."""
+"""Reports API endpoints."""
 from datetime import datetime, timezone
 from flask.views import MethodView
 from flask_smorest import Blueprint
 
+from ..extensions import db
 from ..auth import require_token
+from ..models import Stock, Surplus, Transaction, Location, Article, Batch
 from ..schemas.reports import (
     InventoryReportSchema, TransactionReportSchema, ReportQuerySchema
 )
@@ -29,18 +31,62 @@ class InventoryReport(MethodView):
     def get(self, query_args):
         """Get inventory report.
         
-        Returns current stock and surplus levels.
-        
-        **Note: This is a stub - full implementation pending.**
+        Returns current stock and surplus levels grouped by location/article/batch.
         """
-        # Stub response
-        return {
-            'error': {
-                'code': 'NOT_IMPLEMENTED',
-                'message': 'Inventory report not yet implemented',
-                'details': {'endpoint': '/api/reports/inventory'}
+        # Build stock query
+        stock_query = db.session.query(Stock)
+        surplus_query = db.session.query(Surplus)
+        
+        if query_args.get('location_id'):
+            stock_query = stock_query.filter_by(location_id=query_args['location_id'])
+            surplus_query = surplus_query.filter_by(location_id=query_args['location_id'])
+        
+        if query_args.get('article_id'):
+            stock_query = stock_query.filter_by(article_id=query_args['article_id'])
+            surplus_query = surplus_query.filter_by(article_id=query_args['article_id'])
+        
+        stocks = stock_query.all()
+        surpluses = surplus_query.all()
+        
+        # Build combined inventory map
+        inventory_map = {}
+        
+        for stock in stocks:
+            key = (stock.location_id, stock.article_id, stock.batch_id)
+            inventory_map[key] = {
+                'location_id': stock.location_id,
+                'location_code': stock.location.code if stock.location else None,
+                'article_id': stock.article_id,
+                'article_no': stock.article.article_no if stock.article else None,
+                'batch_id': stock.batch_id,
+                'batch_code': stock.batch.batch_code if stock.batch else None,
+                'stock_kg': float(stock.quantity_kg),
+                'surplus_kg': 0.0
             }
-        }, 501
+        
+        for surplus in surpluses:
+            key = (surplus.location_id, surplus.article_id, surplus.batch_id)
+            if key in inventory_map:
+                inventory_map[key]['surplus_kg'] = float(surplus.quantity_kg)
+            else:
+                inventory_map[key] = {
+                    'location_id': surplus.location_id,
+                    'location_code': surplus.location.code if surplus.location else None,
+                    'article_id': surplus.article_id,
+                    'article_no': surplus.article.article_no if surplus.article else None,
+                    'batch_id': surplus.batch_id,
+                    'batch_code': surplus.batch.batch_code if surplus.batch else None,
+                    'stock_kg': 0.0,
+                    'surplus_kg': float(surplus.quantity_kg)
+                }
+        
+        items = list(inventory_map.values())
+        
+        return {
+            'items': items,
+            'total': len(items),
+            'generated_at': datetime.now(timezone.utc).isoformat()
+        }
 
 
 @blp.route('/transactions')
@@ -56,14 +102,25 @@ class TransactionReport(MethodView):
         """Get transaction report.
         
         Returns transaction history for audit purposes.
-        
-        **Note: This is a stub - full implementation pending.**
         """
-        # Stub response
+        query = Transaction.query
+        
+        if query_args.get('location_id'):
+            query = query.filter_by(location_id=query_args['location_id'])
+        
+        if query_args.get('article_id'):
+            query = query.filter_by(article_id=query_args['article_id'])
+        
+        if query_args.get('from_date'):
+            query = query.filter(Transaction.occurred_at >= query_args['from_date'])
+        
+        if query_args.get('to_date'):
+            query = query.filter(Transaction.occurred_at <= query_args['to_date'])
+        
+        transactions = query.order_by(Transaction.occurred_at.desc()).limit(1000).all()
+        
         return {
-            'error': {
-                'code': 'NOT_IMPLEMENTED',
-                'message': 'Transaction report not yet implemented',
-                'details': {'endpoint': '/api/reports/transactions'}
-            }
-        }, 501
+            'items': [tx.to_dict() for tx in transactions],
+            'total': len(transactions),
+            'generated_at': datetime.now(timezone.utc).isoformat()
+        }
