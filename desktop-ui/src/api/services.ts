@@ -82,17 +82,24 @@ export const rejectDraft = async (id: number, data: ApprovalRequest) => {
 export const extractErrorMessage = (error: unknown): string => {
     try {
         if (error instanceof AxiosError && error.response?.data) {
-            const apiError = error.response.data as ApiErrorResponse;
-            // Handle case where error is just a string (e.g. 401 default body) or html
-            if (typeof apiError === 'string') return apiError;
+            const data = error.response.data as any;
 
-            if (apiError.error?.message) {
-                if (apiError.error.details) {
-                    // If details exist, append them for clarity
-                    const detailsStr = Object.entries(apiError.error.details).map(([k, v]) => `${k}: ${v}`).join(', ');
-                    return `${apiError.error.message} (${detailsStr})`;
+            // 1. Handle string/html response
+            if (typeof data === 'string') return data;
+
+            // 2. Handle Flask-JWT-Extended style { msg: "..." }
+            if (data.msg) return data.msg;
+
+            // 3. Handle generic { message: "..." }
+            if (data.message) return data.message;
+
+            // 4. Handle structured ApiErrorResponse { error: { message: "..." } }
+            if (data.error?.message) {
+                if (data.error.details && Object.keys(data.error.details).length > 0) {
+                    const detailsStr = Object.entries(data.error.details).map(([k, v]) => `${k}: ${v}`).join(', ');
+                    return `${data.error.message} (${detailsStr})`;
                 }
-                return apiError.error.message;
+                return data.error.message;
             }
         }
     } catch (e) {

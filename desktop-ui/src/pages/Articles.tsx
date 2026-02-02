@@ -7,8 +7,8 @@ import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconSearch, IconDotsVertical, IconPlus, IconArchive, IconRestore, IconTrash } from '@tabler/icons-react';
-import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle } from '../../api/services';
-import { Article } from '../../api/types';
+import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle } from '../api/services';
+import { Article } from '../api/types';
 
 export default function Articles() {
     const queryClient = useQueryClient();

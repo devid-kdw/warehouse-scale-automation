@@ -46,7 +46,7 @@ class DraftList(MethodView):
         drafts = query.order_by(WeighInDraft.created_at.desc()).all()
         
         return {
-            'items': [d.to_dict() for d in drafts],
+            'items': drafts,
             'total': len(drafts)
         }
     
@@ -121,7 +121,7 @@ class DraftList(MethodView):
         db.session.add(draft)
         db.session.commit()
         
-        return draft.to_dict(), 201
+        return draft, 201
 
 
 @blp.route('/<int:draft_id>')
@@ -144,7 +144,7 @@ class DraftDetail(MethodView):
                     'details': {}
                 }
             }, 404
-        return draft.to_dict()
+        return draft
     
     @blp.doc(security=[{'bearerAuth': []}])
     @blp.arguments(DraftUpdateSchema)
@@ -191,4 +191,4 @@ class DraftDetail(MethodView):
         
         db.session.commit()
         
-        return draft.to_dict()
+        return draft

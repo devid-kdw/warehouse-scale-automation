@@ -5,7 +5,7 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconCheck, IconX, IconEye } from '@tabler/icons-react';
+import { IconX } from '@tabler/icons-react';
 import { getDrafts, approveDraft, rejectDraft, extractErrorMessage } from '../../api/services';
 import { WeighInDraft } from '../../api/types';
 import { STORAGE_KEYS } from '../../api/client';

@@ -44,7 +44,7 @@ class ArticleList(MethodView):
             articles = Article.query.filter_by(is_active=True).all()
         
         return {
-            'items': [a.to_dict() for a in articles],
+            'items': articles,
             'total': len(articles)
         }
     
@@ -75,7 +75,7 @@ class ArticleList(MethodView):
         db.session.add(article)
         db.session.commit()
         
-        return article.to_dict(), 201
+        return article, 201
 
 
 @blp.route('/<string:article_no>')
@@ -98,7 +98,7 @@ class ArticleDetail(MethodView):
                     'details': {}
                 }
             }, 404
-        return article.to_dict()
+        return article
 
 
 @blp.route('/<int:article_id>/archive')

@@ -1,32 +1,4 @@
-import { Container, Title, Text, Alert } from '@mantine/core';
-
-export const DraftEntry = () => (
-    <Container>
-        <Title>Draft Entry</Title>
-        <Text>Form coming soon...</Text>
-    </Container>
-);
-
-export const DraftApproval = () => (
-    <Container>
-        <Title>Draft Approval</Title>
-        <Text>Dashboard coming soon...</Text>
-    </Container>
-);
-
-export const Articles = () => (
-    <Container>
-        <Title>Articles</Title>
-        <Text>List coming soon...</Text>
-    </Container>
-);
-
-export const Batches = () => (
-    <Container>
-        <Title>Batches</Title>
-        <Text>List coming soon...</Text>
-    </Container>
-);
+import { Container, Title, Alert } from '@mantine/core';
 
 export const Inventory = () => (
     <Container p="xl">

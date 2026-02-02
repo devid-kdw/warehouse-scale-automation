@@ -1,5 +1,5 @@
 """Centralized error handling with standard error format."""
-from flask import jsonify
+from flask import jsonify, request
 from marshmallow import ValidationError as MarshmallowValidationError
 from sqlalchemy.exc import IntegrityError
 
@@ -123,6 +123,20 @@ def register_error_handlers(app):
     @app.errorhandler(500)
     def handle_internal_error(error):
         app.logger.error(f'Internal error: {error}')
+        # In development, expose the actual error
+        if app.config.get('DEBUG') or app.config.get('ENV') == 'development':
+            # Extract original exception if possible
+            message = str(error)
+            if hasattr(error, 'original_exception'):
+                message = str(error.original_exception)
+            
+            response, status = error_response('INTERNAL_ERROR', message)
+            # FORCE CORS headers to ensure the UI can see this error
+            response.headers['Access-Control-Allow-Origin'] = request.headers.get('Origin', '*')
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response, status
+            
         return error_response(
             'INTERNAL_ERROR',
             'An internal error occurred'

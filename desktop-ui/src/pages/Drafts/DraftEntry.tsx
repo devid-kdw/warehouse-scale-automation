@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
     Container, Paper, Title, Select, TextInput, NumberInput,
-    Button, Group, Stack, Text, Alert, ActionIcon, Tooltip
+    Button, Group, Stack, Alert, ActionIcon, Tooltip
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { useQuery, useMutation } from '@tanstack/react-query';

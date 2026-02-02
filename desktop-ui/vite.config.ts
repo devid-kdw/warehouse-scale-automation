@@ -13,5 +13,23 @@ export default defineConfig({
     server: {
         port: 5173,
         strictPort: true,
+        proxy: {
+            '/api': {
+                target: 'http://127.0.0.1:5001',
+                changeOrigin: true,
+            },
+            '/health': {
+                target: 'http://127.0.0.1:5001',
+                changeOrigin: true,
+            },
+            '/openapi': {
+                target: 'http://127.0.0.1:5001',
+                changeOrigin: true,
+            },
+            '/swagger-ui': {
+                target: 'http://127.0.0.1:5001',
+                changeOrigin: true,
+            },
+        }
     },
 });

@@ -47,7 +47,7 @@ class ArticleBatchList(MethodView):
         ).all()
         
         return {
-            'items': [b.to_dict() for b in batches],
+            'items': batches,
             'total': len(batches)
         }
 
@@ -110,4 +110,4 @@ class BatchList(MethodView):
         db.session.add(batch)
         db.session.commit()
         
-        return batch.to_dict(), 201
+        return batch, 201

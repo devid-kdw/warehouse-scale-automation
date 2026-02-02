@@ -58,7 +58,7 @@ class DraftCreateSchema(Schema):
     note = fields.String(allow_none=True, validate=validate.Length(max=500))
     
     @validates('quantity_kg')
-    def validate_quantity_precision(self, value):
+    def validate_quantity_precision(self, value, **kwargs):
         """Validate quantity has max 2 decimal places."""
         rounded = round(value, 2)
         if abs(value - rounded) > 0.001:
@@ -74,7 +74,7 @@ class DraftUpdateSchema(Schema):
     note = fields.String(allow_none=True, validate=validate.Length(max=500))
     
     @validates('quantity_kg')
-    def validate_quantity_precision(self, value):
+    def validate_quantity_precision(self, value, **kwargs):
         """Validate quantity has max 2 decimal places."""
         if value is not None:
             rounded = round(value, 2)

@@ -5,7 +5,10 @@ import { Sidebar } from './components/Sidebar';
 import Settings from './pages/Settings';
 import DraftEntry from './pages/Drafts/DraftEntry';
 import DraftApproval from './pages/Drafts/DraftApproval';
-import { Articles, Batches, Inventory } from './pages/Placeholders'; // Still placeholders for now
+import Articles from './pages/Articles';
+import Batches from './pages/Batches';
+import { Inventory } from './pages/Placeholders';
+import logo from './assets/enikon-logo.jpg';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -25,7 +28,7 @@ function Layout() {
         >
             <AppShell.Header>
                 <Group h="100%" px="md" align="center">
-                    <img src="./src/assets/enikon-logo.jpg" alt="Enikon Aerospace" style={{ height: 40 }} />
+                    <img src={logo} alt="Enikon Aerospace" style={{ height: 40 }} />
                     <Text c="white" fw={700} size="lg">Warehouse Ops</Text>
                 </Group>
             </AppShell.Header>

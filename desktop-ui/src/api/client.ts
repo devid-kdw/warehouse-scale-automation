@@ -24,13 +24,22 @@ apiClient.interceptors.request.use((config) => {
     const storedUrl = localStorage.getItem(STORAGE_KEYS.BASE_URL);
     const token = localStorage.getItem(STORAGE_KEYS.API_TOKEN);
 
-    // Update Base URL if stored
+    // Update Base URL if stored, but respect proxy in DEV
     if (storedUrl && config.baseURL !== storedUrl) {
-        config.baseURL = storedUrl;
+        // In DEV, if the user has localhost:5001 or 127.0.0.1:5001 configured, 
+        // ignore it and use relative path to hit the proxy
+        if (import.meta.env.DEV && (storedUrl.includes('localhost') || storedUrl.includes('127.0.0.1'))) {
+            config.baseURL = '';
+        } else {
+            config.baseURL = storedUrl;
+        }
+    } else if (import.meta.env.DEV && config.baseURL === DEFAULT_BASE_URL) {
+        config.baseURL = ''; // Default to relative in dev
     }
 
-    // Inject Token
-    if (token) {
+    // Inject Token (skip for public endpoints)
+    const isPublicEndpoint = config.url?.endsWith('/health');
+    if (token && !isPublicEndpoint) {
         config.headers.Authorization = `Bearer ${token}`;
     }
 

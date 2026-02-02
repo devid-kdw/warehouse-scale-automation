@@ -7,8 +7,8 @@ import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconPlus, IconBox, IconAlertCircle } from '@tabler/icons-react';
-import { Article, Batch } from '../../api/types';
-import { getArticles, getBatchesByArticle, createBatch, extractErrorMessage } from '../../api/services';
+import { Article, Batch } from '../api/types';
+import { getArticles, getBatchesByArticle, createBatch, extractErrorMessage } from '../api/services';
 
 export default function Batches() {
     const queryClient = useQueryClient();

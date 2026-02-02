@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { TextInput, Button, Paper, Title, Container, Group, Text, Alert } from '@mantine/core';
 import { IconCheck, IconX, IconDatabase } from '@tabler/icons-react';
-import { STORAGE_KEYS } from '../api/client';
-import { checkHealth } from '../api/services';
+import { STORAGE_KEYS, apiClient } from '../api/client';
+import { checkHealth, extractErrorMessage } from '../api/services';
 import { useMutation } from '@tanstack/react-query';
 
 export default function Settings() {
@@ -18,15 +18,32 @@ export default function Settings() {
     }, []);
 
     const saveSettings = () => {
-        localStorage.setItem(STORAGE_KEYS.BASE_URL, baseUrl);
-        localStorage.setItem(STORAGE_KEYS.API_TOKEN, token);
+        const cleanBaseUrl = baseUrl.trim().replace(/\/$/, '') || 'http://localhost:5001'; // Default if empty
+        const cleanToken = token.trim().replace(/^Bearer\s+/i, ''); // Remove "Bearer " prefix if present
+
+        localStorage.setItem(STORAGE_KEYS.BASE_URL, cleanBaseUrl);
+        localStorage.setItem(STORAGE_KEYS.API_TOKEN, cleanToken);
         localStorage.setItem(STORAGE_KEYS.ACTOR_ID, actorId);
     };
 
     const testConnectionMutation = useMutation({
         mutationFn: async () => {
-            saveSettings(); // Save before testing so client picks it up
-            return checkHealth();
+            saveSettings(); // Save so client picks up new token
+
+            // 1. Check basic connectivity
+            const health = await checkHealth();
+
+            // 2. Verify Token (call a protected endpoint)
+            // We use getArticles with a small limit if possible, or just the list
+            try {
+                // If this fails with 401, the mutation will fail
+                await apiClient.get('/api/articles?limit=1');
+            } catch (error) {
+                const msg = extractErrorMessage(error);
+                throw new Error(`Token verification failed: ${msg}`);
+            }
+
+            return health;
         }
     });
 

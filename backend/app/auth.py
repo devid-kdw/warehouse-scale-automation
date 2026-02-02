@@ -60,6 +60,10 @@ def require_token(f):
         # Dev convenience: skip auth if no token configured and explicitly allowed
         if env != 'production' and not expected_token and allow_no_auth:
             return f(*args, **kwargs)
+
+        # Allow CORS preflight requests
+        if request.method == 'OPTIONS':
+            return f(*args, **kwargs)
         
         # Production with no token configured - reject all requests
         if not expected_token:
