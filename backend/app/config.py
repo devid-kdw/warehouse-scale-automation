@@ -26,6 +26,16 @@ class Config:
     
     # Security
     API_TOKEN = os.getenv('API_TOKEN', '')
+    ALLOW_NO_AUTH_IN_DEV = os.getenv('ALLOW_NO_AUTH_IN_DEV', 'false').lower() == 'true'
+    
+    # CORS configuration
+    # Comma-separated list of allowed origins
+    CORS_ORIGINS = os.getenv(
+        'CORS_ORIGINS',
+        'http://localhost:5173,http://localhost:3000'
+    )
+    # Allow all origins (dev only - use with caution)
+    CORS_ALLOW_ALL = os.getenv('CORS_ALLOW_ALL', 'false').lower() == 'true'
     
     # API documentation
     API_TITLE = 'Warehouse Scale Automation API'
@@ -52,3 +62,10 @@ class Config:
     # Business rules
     QUANTITY_MIN = 0.01
     QUANTITY_MAX = 9999.99
+    
+    @classmethod
+    def get_cors_origins(cls):
+        """Parse CORS_ORIGINS into a list."""
+        if cls.CORS_ALLOW_ALL:
+            return '*'
+        return [origin.strip() for origin in cls.CORS_ORIGINS.split(',') if origin.strip()]

@@ -2,132 +2,10 @@
 import pytest
 from decimal import Decimal
 
-from app import create_app
 from app.extensions import db
-from app.models import (
-    User, Location, Article, Batch, Stock, Surplus, 
-    WeighInDraft, Transaction, ApprovalAction
-)
+from app.models import WeighInDraft, Stock, Surplus, Transaction
 from app.services.approval_service import approve_draft, reject_draft
 from app.error_handling import AppError, InsufficientStockError
-
-
-class TestConfig:
-    """Test configuration."""
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'postgresql+psycopg2://localhost:5432/warehouse_test'
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
-    API_TOKEN = 'test-token'
-    # Required for flask-smorest
-    API_TITLE = 'Warehouse API Test'
-    API_VERSION = '0.1.0'
-    OPENAPI_VERSION = '3.0.3'
-
-
-@pytest.fixture
-def app():
-    """Create application for testing."""
-    app = create_app(TestConfig)
-    with app.app_context():
-        db.create_all()
-        yield app
-        db.session.rollback()
-        db.drop_all()
-
-
-@pytest.fixture
-def location(app):
-    """Create test location."""
-    with app.app_context():
-        loc = Location(code='13', name='Test Warehouse')
-        db.session.add(loc)
-        db.session.commit()
-        loc_id = loc.id
-    return loc_id
-
-
-@pytest.fixture
-def user(app):
-    """Create test admin user."""
-    with app.app_context():
-        u = User(username='testadmin', role='ADMIN', is_active=True)
-        db.session.add(u)
-        db.session.commit()
-        user_id = u.id
-    return user_id
-
-
-@pytest.fixture
-def article(app):
-    """Create test article."""
-    with app.app_context():
-        art = Article(article_no='TEST-001', description='Test Article')
-        db.session.add(art)
-        db.session.commit()
-        art_id = art.id
-    return art_id
-
-
-@pytest.fixture
-def batch(app, article):
-    """Create test batch."""
-    with app.app_context():
-        b = Batch(article_id=article, batch_code='1234')
-        db.session.add(b)
-        db.session.commit()
-        batch_id = b.id
-    return batch_id
-
-
-@pytest.fixture
-def stock(app, location, article, batch):
-    """Create test stock with 10kg."""
-    with app.app_context():
-        s = Stock(
-            location_id=location,
-            article_id=article,
-            batch_id=batch,
-            quantity_kg=Decimal('10.00')
-        )
-        db.session.add(s)
-        db.session.commit()
-        stock_id = s.id
-    return stock_id
-
-
-@pytest.fixture
-def surplus(app, location, article, batch):
-    """Create test surplus with 5kg."""
-    with app.app_context():
-        s = Surplus(
-            location_id=location,
-            article_id=article,
-            batch_id=batch,
-            quantity_kg=Decimal('5.00')
-        )
-        db.session.add(s)
-        db.session.commit()
-        surplus_id = s.id
-    return surplus_id
-
-
-@pytest.fixture
-def draft(app, location, article, batch, user):
-    """Create test draft for 3kg."""
-    with app.app_context():
-        d = WeighInDraft(
-            location_id=location,
-            article_id=article,
-            batch_id=batch,
-            quantity_kg=Decimal('3.00'),
-            client_event_id='test-event-001',
-            created_by_user_id=user,
-            source='manual'
-        )
-        db.session.add(d)
-        db.session.commit()
-        draft_id = d.id
-    return draft_id
 
 
 class TestApproveWithSurplusOnly:
@@ -236,7 +114,8 @@ class TestApproveInsufficientStock:
             assert error.details['shortage_kg'] == 5.0
             
             # Verify draft status unchanged
-            draft_obj = WeighInDraft.query.get(d.id)
+            db.session.rollback()
+            draft_obj = db.session.get(WeighInDraft, d.id)
             assert draft_obj.status == 'DRAFT'
             
             # Verify no inventory changes

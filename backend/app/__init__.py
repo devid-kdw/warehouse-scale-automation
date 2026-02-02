@@ -7,6 +7,7 @@ from .extensions import db, migrate, api as smorest_api
 from .error_handling import register_error_handlers
 from .api import register_blueprints
 from .cli import register_cli
+from .auth import validate_token_config
 
 
 def create_app(config_class=Config):
@@ -26,8 +27,9 @@ def create_app(config_class=Config):
     migrate.init_app(app, db)
     smorest_api.init_app(app)
     
-    # Enable CORS
-    CORS(app)
+    # Configure CORS with proper origins
+    cors_origins = config_class.get_cors_origins() if hasattr(config_class, 'get_cors_origins') else '*'
+    CORS(app, origins=cors_origins, supports_credentials=True)
     
     # Register error handlers
     register_error_handlers(app)
@@ -41,5 +43,7 @@ def create_app(config_class=Config):
     # Import models to ensure they're registered with SQLAlchemy
     with app.app_context():
         from . import models  # noqa: F401
+        # Validate token configuration
+        validate_token_config()
     
     return app
