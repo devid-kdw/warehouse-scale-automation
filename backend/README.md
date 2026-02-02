@@ -48,29 +48,20 @@ pytest tests/ -v
 
 ---
 
-## API Documentation
+## Batch Code Validation Rules
 
-- **Swagger UI**: http://localhost:5001/swagger-ui
-- **OpenAPI JSON**: http://localhost:5001/openapi.json
+Valid batch codes are **numeric only** and must match:
 
-## Authentication
+| Format | Length | Examples | Manufacturer |
+|--------|--------|----------|--------------|
+| Short | 4-5 digits | 0044, 1045, 10455 | Mankiewicz |
+| Long | 9-12 digits | 292456953, 2924662112, 292466211255 | Akzo Nobel |
 
-All `/api/*` endpoints require Bearer token:
-```
-Authorization: Bearer <API_TOKEN>
-```
-
-Set `API_TOKEN` in your `.env` file.
-
-### Security Behavior
-
-| ENV | API_TOKEN | ALLOW_NO_AUTH_IN_DEV | Behavior |
-|-----|-----------|----------------------|----------|
-| production | empty | - | **Startup error** |
-| production | set | - | Token required |
-| development | empty | false | Token required (warn) |
-| development | empty | true | No auth needed (dev only) |
-| development | set | - | Token required |
+**Invalid examples:**
+- `123` (too short - 3 digits)
+- `123456` (in the gap - 6-8 digits)
+- `abc123` (non-numeric)
+- `12-34` (contains hyphen)
 
 ---
 
@@ -83,7 +74,7 @@ Transaction records are the **audit trail** for inventory changes. Actual invent
 | `WEIGH_IN` | **Positive** | Amount weighed/recorded from scale |
 | `SURPLUS_CONSUMED` | **Negative** | Decrease in surplus inventory |
 | `STOCK_CONSUMED` | **Negative** | Decrease in stock inventory |
-| `INVENTORY_ADJUSTMENT` | **+/-** | Manual corrections (future) |
+| `INVENTORY_ADJUSTMENT` | **+/-** | Delta (new - old) for audit |
 
 **Example**: Approving a 10kg draft with 3kg surplus and 7kg from stock creates:
 - `WEIGH_IN: +10.00kg`
@@ -92,98 +83,100 @@ Transaction records are the **audit trail** for inventory changes. Actual invent
 
 ---
 
-## API Endpoints
+## API Documentation
 
-### Health (Public)
+- **Swagger UI**: http://localhost:5001/swagger-ui
+- **OpenAPI JSON**: http://localhost:5001/openapi.json
+
+## Authentication
+
+All `/api/*` endpoints require Bearer token:
+```
+Authorization: Bearer <API_TOKEN>
+```
+
+### Security Behavior
+
+| ENV | API_TOKEN | Behavior |
+|-----|-----------|----------|
+| production | empty | **Startup error** |
+| production | set | Token required |
+| development | empty | Token required (ALLOW_NO_AUTH_IN_DEV=true skips) |
+| development | set | Token required |
+
+---
+
+## Smoke Test Commands
+
 ```bash
+# Set token for convenience
+export TOKEN="dev-secret-token-123"
+
+# Health check
 curl http://localhost:5001/health
-```
 
-### Articles
-
-**List articles:**
-```bash
-curl -H "Authorization: Bearer $API_TOKEN" \
-  http://localhost:5001/api/articles
-```
-
-**Create article:**
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $API_TOKEN" \
+# Create article
+curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"article_no": "ART-001", "description": "Blue Paint", "is_paint": true}' \
+  -d '{"article_no": "TEST-001", "description": "Test Paint"}' \
   http://localhost:5001/api/articles
-```
 
-### Batches
-
-**List batches for article:**
-```bash
-curl -H "Authorization: Bearer $API_TOKEN" \
-  http://localhost:5001/api/articles/ART-001/batches
-```
-
-**Create batch:**
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $API_TOKEN" \
+# Create batch (4-5 digits)
+curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"article_id": 1, "batch_code": "0044"}' \
   http://localhost:5001/api/batches
-```
 
-### Drafts
+# Create batch (9-12 digits)
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"article_id": 1, "batch_code": "292456953"}' \
+  http://localhost:5001/api/batches
 
-**List drafts:**
-```bash
-curl -H "Authorization: Bearer $API_TOKEN" \
-  "http://localhost:5001/api/drafts?status=DRAFT"
-```
+# Set stock via inventory adjust
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "location_id": 1,
+    "article_id": 1,
+    "batch_id": 1,
+    "target": "stock",
+    "mode": "set",
+    "quantity_kg": 50.00,
+    "actor_user_id": 1,
+    "note": "Initial stock"
+  }' \
+  http://localhost:5001/api/inventory/adjust
 
-**Create draft:**
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $API_TOKEN" \
+# Create draft
+curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "location_id": 1,
     "article_id": 1,
     "batch_id": 1,
     "quantity_kg": 5.25,
-    "client_event_id": "uuid-12345"
+    "client_event_id": "test-001"
   }' \
   http://localhost:5001/api/drafts
-```
 
-### Approvals
-
-**Approve draft:**
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $API_TOKEN" \
+# Approve draft
+curl -X POST -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"actor_user_id": 1, "note": "Approved"}' \
+  -d '{"actor_user_id": 1}' \
   http://localhost:5001/api/drafts/1/approve
-```
 
-**Reject draft:**
-```bash
-curl -X POST \
-  -H "Authorization: Bearer $API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"actor_user_id": 1, "note": "Incorrect quantity"}' \
-  http://localhost:5001/api/drafts/1/reject
-```
+# Archive article
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/articles/1/archive
 
-### Reports
+# List archived articles
+curl -H "Authorization: Bearer $TOKEN" \
+  "http://localhost:5001/api/articles?active=false"
 
-```bash
-curl -H "Authorization: Bearer $API_TOKEN" \
-  http://localhost:5001/api/reports/inventory
-
-curl -H "Authorization: Bearer $API_TOKEN" \
-  http://localhost:5001/api/reports/transactions
+# Restore article
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  http://localhost:5001/api/articles/1/restore
 ```
 
 ---
@@ -197,7 +190,7 @@ curl -H "Authorization: Bearer $API_TOKEN" \
 | 400 | Validation error |
 | 401 | Invalid/missing token |
 | 404 | Resource not found |
-| 409 | Conflict (duplicate, wrong status, insufficient stock) |
+| 409 | Conflict (duplicate, wrong status, insufficient stock, article in use) |
 | 500 | Internal server error |
 
 ## Environment Variables
@@ -212,6 +205,7 @@ curl -H "Authorization: Bearer $API_TOKEN" \
 | ALLOW_NO_AUTH_IN_DEV | false | Skip auth in dev when token empty |
 | CORS_ORIGINS | localhost:5173,3000 | Allowed CORS origins |
 | CORS_ALLOW_ALL | false | Allow all origins (dev only) |
+| TEST_DATABASE_URL | localhost/warehouse_test | Test database |
 
 ## CLI Commands
 
