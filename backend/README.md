@@ -111,6 +111,27 @@ Valid batch codes are **numeric only**:
 
 ---
 
+## Inventory Count (Admin)
+
+Admin can perform inventory count via `POST /api/inventory/count`.
+- **Over**: Excess quantity added to Surplus.
+- **Under**: Surplus reset to 0; remaining deficit creates `INVENTORY_SHORTAGE` draft.
+- **Drafts**: Shortage drafts consume **Stock only** upon approval.
+
+## Common Error Codes
+
+| Code | HTTP | Description |
+|------|------|-------------|
+| `ALIAS_LIMIT_REACHED` | 409 | Max 5 aliases per article allowed |
+| `ALIAS_NOT_FOUND` | 404 | Alias ID not found |
+| `DUPLICATE_ALIAS` | 409 | Alias already exists globally |
+| `INVALID_EXPIRY_DATE` | 400 | Expiry date required/invalid |
+| `INVENTORY_COUNT_INVALID` | 400 | Invalid count payload |
+| `INSUFFICIENT_STOCK` | 409 | Not enough stock for approval |
+| `DRAFT_NOT_DRAFT` | 400 | Draft not in DRAFT status |
+
+---
+
 ## Running Tests
 
 ```bash

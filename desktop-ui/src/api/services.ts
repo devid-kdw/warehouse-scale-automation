@@ -2,9 +2,9 @@ import { apiClient } from './client';
 import { API_ENDPOINTS } from './endpoints';
 import {
     Article, Batch,
-    WeighInDraft, CreateDraftRequest, ApprovalRequest, ApprovalResponse,
-    CreateArticleRequest, CreateBatchRequest,
-    ApiErrorResponse
+    WeighInDraft, CreateDraftPayload, ApprovalPayload, ApprovalResponse,
+    CreateArticlePayload, CreateBatchPayload,
+    InventoryResponse, InventoryCountPayload, TransactionsResponse, AliasesResponse
 } from './types';
 import { AxiosError } from 'axios';
 
@@ -22,7 +22,7 @@ export const getArticles = async (active: 'true' | 'false' | 'all' = 'true') => 
     return response.data;
 };
 
-export const createArticle = async (data: CreateArticleRequest) => {
+export const createArticle = async (data: CreateArticlePayload) => {
     const response = await apiClient.post<Article>(API_ENDPOINTS.ARTICLES.CREATE, data);
     return response.data;
 };
@@ -50,7 +50,7 @@ export const getBatchesByArticle = async (articleNo: string) => {
     return response.data;
 };
 
-export const createBatch = async (data: CreateBatchRequest) => {
+export const createBatch = async (data: CreateBatchPayload) => {
     const response = await apiClient.post<Batch>(API_ENDPOINTS.BATCHES.CREATE, data);
     return response.data;
 };
@@ -63,18 +63,55 @@ export const getDrafts = async (status?: string) => {
     return response.data;
 };
 
-export const createDraft = async (data: CreateDraftRequest) => {
+export const createDraft = async (data: CreateDraftPayload) => {
     const response = await apiClient.post<WeighInDraft>(API_ENDPOINTS.DRAFTS.CREATE, data);
     return response.data;
 };
 
-export const approveDraft = async (id: number, data: ApprovalRequest) => {
+export const approveDraft = async (id: number, data: ApprovalPayload) => {
     const response = await apiClient.post<ApprovalResponse>(API_ENDPOINTS.DRAFTS.APPROVE(id), data);
     return response.data;
 };
 
-export const rejectDraft = async (id: number, data: ApprovalRequest) => {
+export const rejectDraft = async (id: number, data: ApprovalPayload) => {
     const response = await apiClient.post<ApprovalResponse>(API_ENDPOINTS.DRAFTS.REJECT(id), data);
+    return response.data;
+};
+
+// --- Inventory ---
+export const getInventorySummary = async (filters?: { article_id?: number, batch_id?: number, location_id?: number }) => {
+    const response = await apiClient.get<InventoryResponse>(API_ENDPOINTS.INVENTORY.SUMMARY, {
+        params: filters
+    });
+    return response.data;
+};
+
+export const performInventoryCount = async (data: InventoryCountPayload) => {
+    const response = await apiClient.post(API_ENDPOINTS.INVENTORY.COUNT, data);
+    return response.data;
+};
+
+// --- Transactions ---
+export const getTransactions = async (params?: any) => {
+    const response = await apiClient.get<TransactionsResponse>(API_ENDPOINTS.TRANSACTIONS.LIST, {
+        params
+    });
+    return response.data;
+};
+
+// --- Aliases ---
+export const getAliases = async (articleId: number) => {
+    const response = await apiClient.get<AliasesResponse>(API_ENDPOINTS.ALIASES.LIST(articleId));
+    return response.data;
+};
+
+export const createAlias = async (articleId: number, alias: string) => {
+    const response = await apiClient.post(API_ENDPOINTS.ALIASES.CREATE(articleId), { alias });
+    return response.data;
+};
+
+export const deleteAlias = async (articleId: number, aliasId: number) => {
+    const response = await apiClient.delete(API_ENDPOINTS.ALIASES.DELETE(articleId, aliasId));
     return response.data;
 };
 

@@ -1,74 +1,210 @@
-import { Container, Paper, Title, Text, List, ThemeIcon, Button, Group, Alert } from '@mantine/core';
-import { IconCheck, IconServer, IconArrowRight, IconInfoCircle } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import {
+    Container, Title, Paper, Table, Group, Button, TextInput,
+    Badge, LoadingOverlay, Modal, NumberInput, Stack, Text
+} from '@mantine/core';
+import { useDisclosure } from '@mantine/hooks';
+import { useForm } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+    IconCheck,
+    IconSearch, IconClipboardCheck, IconX,
+} from '@tabler/icons-react';
+import { getInventorySummary, performInventoryCount, extractErrorMessage } from '../api/services'; // Ensure getArticles is imported
+import { InventoryItem, InventoryCountPayload } from '../api/types';
+import { EmptyState } from '../components/common/EmptyState';
+import dayjs from 'dayjs';
 
-export default function Inventory() {
-    const navigate = useNavigate();
+// --- Count Modal Component ---
+function CountModal({ item, opened, onClose }: { item: InventoryItem | null, opened: boolean, onClose: () => void }) {
+    const queryClient = useQueryClient();
+
+    const form = useForm({
+        initialValues: {
+            counted_qty: 0,
+            note: '',
+        },
+        validate: {
+            counted_qty: (val) => val < 0 ? 'Quantity cannot be negative' : null,
+        },
+    });
+
+    const countMutation = useMutation({
+        mutationFn: (values: typeof form.values) => {
+            const payload: InventoryCountPayload = {
+                location_id: item!.location_id,
+                article_id: item!.article_id,
+                batch_id: item!.batch_id,
+                counted_total_qty: values.counted_qty,
+                note: values.note,
+                client_event_id: crypto.randomUUID(),
+            };
+            return performInventoryCount(payload);
+        },
+        onSuccess: () => {
+            notifications.show({ title: 'Success', message: 'Inventory count recorded', color: 'green', icon: <IconCheck size={16} /> });
+            queryClient.invalidateQueries({ queryKey: ['inventory'] });
+            onClose();
+            form.reset();
+        },
+        onError: (err) => {
+            notifications.show({ title: 'Error', message: extractErrorMessage(err), color: 'red', icon: <IconX size={16} /> });
+        }
+    });
+
+    // Reset form when item changes
+    if (item && form.values.counted_qty === 0 && !form.isDirty()) {
+        form.setFieldValue('counted_qty', item.total_qty);
+    }
 
     return (
-        <Container size="md" py="xl">
-            <Group mb="lg">
-                <ThemeIcon size={40} radius="md" color="blue" variant="light">
-                    <IconServer size={24} />
-                </ThemeIcon>
-                <Title order={2}>Inventory</Title>
+        <Modal opened={opened} onClose={onClose} title="Perform Inventory Count" centered>
+            <form onSubmit={form.onSubmit((values) => countMutation.mutate(values))}>
+                <Stack>
+                    <Text size="sm">
+                        <b>Article:</b> {item?.article_no} - {item?.description} <br />
+                        <b>Batch:</b> {item?.batch_code} <br />
+                        <b>Location:</b> {item?.location_code}
+                    </Text>
+
+                    <NumberInput
+                        label="Counted Quantity (Total)"
+                        description={`Current System Qty: ${item?.total_qty} KG`}
+                        decimalScale={2}
+                        min={0}
+                        {...form.getInputProps('counted_qty')}
+                    />
+
+                    <TextInput
+                        label="Note"
+                        placeholder="Reason for discrepancy..."
+                        {...form.getInputProps('note')}
+                    />
+
+                    <Group justify="flex-end" mt="md">
+                        <Button variant="default" onClick={onClose}>Cancel</Button>
+                        <Button type="submit" loading={countMutation.isPending} leftSection={<IconClipboardCheck size={16} />}>
+                            Submit Count
+                        </Button>
+                    </Group>
+                </Stack>
+            </form>
+        </Modal>
+    );
+}
+
+export default function Inventory() {
+    const [search, setSearch] = useState('');
+    const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+    const [opened, { open, close }] = useDisclosure(false);
+
+    // Fetch Inventory
+    const { data, isLoading } = useQuery({
+        queryKey: ['inventory'],
+        queryFn: () => getInventorySummary(),
+    });
+
+    // Filter logic
+    const filteredItems = data?.items.filter(item =>
+        item.article_no.toLowerCase().includes(search.toLowerCase()) ||
+        (item.description || '').toLowerCase().includes(search.toLowerCase()) ||
+        item.batch_code.toLowerCase().includes(search.toLowerCase()) ||
+        item.location_code.toLowerCase().includes(search.toLowerCase())
+    ) || [];
+
+    const openCountModal = (item: InventoryItem) => {
+        setSelectedItem(item);
+        open();
+    };
+
+    const rows = filteredItems.map((item) => {
+        const isExpired = item.expiry_date && dayjs(item.expiry_date).isBefore(dayjs());
+        const isExpiringSoon = item.expiry_date && dayjs(item.expiry_date).isBefore(dayjs().add(30, 'days')) && !isExpired;
+
+        return (
+            <Table.Tr key={`${item.location_id}-${item.article_id}-${item.batch_id}`}>
+                <Table.Td>{item.location_code}</Table.Td>
+                <Table.Td>
+                    <Text size="sm" fw={500}>{item.article_no}</Text>
+                    <Text size="xs" c="dimmed">{item.description}</Text>
+                </Table.Td>
+                <Table.Td>{item.batch_code}</Table.Td>
+                <Table.Td>
+                    {item.expiry_date ? (
+                        <Badge
+                            color={isExpired ? 'red' : (isExpiringSoon ? 'orange' : 'gray')}
+                            variant={isExpired ? 'filled' : 'light'}
+                        >
+                            {dayjs(item.expiry_date).format('DD.MM.YYYY')}
+                        </Badge>
+                    ) : '-'}
+                </Table.Td>
+                <Table.Td fw={700}>{item.stock_qty.toFixed(2)}</Table.Td>
+                <Table.Td>{item.surplus_qty.toFixed(2)}</Table.Td>
+                <Table.Td fw={900} c="blue">{item.total_qty.toFixed(2)}</Table.Td>
+                <Table.Td>
+                    <Button
+                        size="xs"
+                        variant="subtle"
+                        leftSection={<IconClipboardCheck size={14} />}
+                        onClick={() => openCountModal(item)}
+                    >
+                        Count
+                    </Button>
+                </Table.Td>
+            </Table.Tr>
+        );
+    });
+
+    return (
+        <Container size="xl" py="xl">
+            <Group justify="space-between" mb="lg">
+                <Title order={2}>Inventory Overview</Title>
+                <Button leftSection={<IconClipboardCheck size={16} />} disabled>
+                    Full Stocktake
+                </Button>
             </Group>
 
-            <Alert icon={<IconInfoCircle size={16} />} title="Inventory Endpoint Missing" color="blue" mb="xl">
-                The backend currently does not provide an endpoint to list stock or surplus levels (e.g., <code>GET /api/inventory</code>).
-                However, the system tracks inventory adjustments centrally.
-            </Alert>
+            <Paper shadow="xs" p="md" withBorder>
+                <TextInput
+                    placeholder="Search by article, batch, or location..."
+                    leftSection={<IconSearch size={16} />}
+                    mb="md"
+                    value={search}
+                    onChange={(e) => setSearch(e.currentTarget.value)}
+                />
 
-            <Paper shadow="xs" p="xl" withBorder>
-                <Title order={3} mb="md">What you can do now</Title>
-                <Text mb="md">
-                    While the inventory list view is under development, you can perform all other critical warehouse operations:
-                </Text>
+                <div style={{ position: 'relative', minHeight: 200 }}>
+                    <LoadingOverlay visible={isLoading} />
 
-                <List
-                    spacing="md"
-                    size="sm"
-                    center
-                    icon={
-                        <ThemeIcon color="teal" size={24} radius="xl">
-                            <IconCheck size={16} />
-                        </ThemeIcon>
-                    }
-                >
-                    <List.Item>
-                        <Group justify="space-between">
-                            <Text>Create and Manage Articles</Text>
-                            <Button variant="subtle" size="xs" onClick={() => navigate('/articles')} rightSection={<IconArrowRight size={14} />}>Go to Articles</Button>
-                        </Group>
-                    </List.Item>
-                    <List.Item>
-                        <Group justify="space-between">
-                            <Text>Register new Batches</Text>
-                            <Button variant="subtle" size="xs" onClick={() => navigate('/batches')} rightSection={<IconArrowRight size={14} />}>Go to Batches</Button>
-                        </Group>
-                    </List.Item>
-                    <List.Item>
-                        <Group justify="space-between">
-                            <Text>Record Weigh-Ins (Drafts)</Text>
-                            <Button variant="subtle" size="xs" onClick={() => navigate('/drafts/new')} rightSection={<IconArrowRight size={14} />}>New Draft</Button>
-                        </Group>
-                    </List.Item>
-                    <List.Item>
-                        <Group justify="space-between">
-                            <Text>Approve or Reject Pending Drafts</Text>
-                            <Button variant="subtle" size="xs" onClick={() => navigate('/drafts')} rightSection={<IconArrowRight size={14} />}>Go to Approvals</Button>
-                        </Group>
-                    </List.Item>
-                </List>
+                    {filteredItems.length === 0 && !isLoading ? (
+                        <EmptyState message="No inventory items found" />
+                    ) : (
+                        <Table striped highlightOnHover>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>Location</Table.Th>
+                                    <Table.Th>Article</Table.Th>
+                                    <Table.Th>Batch</Table.Th>
+                                    <Table.Th>Expiry</Table.Th>
+                                    <Table.Th>Stock (KG)</Table.Th>
+                                    <Table.Th>Surplus (KG)</Table.Th>
+                                    <Table.Th>Total (KG)</Table.Th>
+                                    <Table.Th w={100}></Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>{rows}</Table.Tbody>
+                        </Table>
+                    )}
+                </div>
             </Paper>
 
-            <Paper shadow="xs" p="xl" withBorder mt="xl" bg="gray.1">
-                <Title order={4} mb="xs">Note for Developers</Title>
-                <Text size="sm" c="dimmed">
-                    To enable the Inventory View, the backend must expose a <code>GET /api/inventory</code> endpoint returning aggregated stock and surplus by Article/Batch/Location.
-                    Currently, inventory data resides in the <code>Stock</code> and <code>Surplus</code> tables but is only accessed via transaction logic.
-                </Text>
-            </Paper>
+            <CountModal
+                item={selectedItem}
+                opened={opened}
+                onClose={() => { close(); setSelectedItem(null); }}
+            />
         </Container>
     );
 }

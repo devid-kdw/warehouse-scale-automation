@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import {
     Container, Paper, Title, Select, TextInput, NumberInput,
     Button, Group, Stack, Alert, ActionIcon, Tooltip, Text, Anchor
@@ -6,18 +6,18 @@ import {
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconRefresh, IconCheck, IconX, IconDatabase, IconArrowRight } from '@tabler/icons-react';
+import { IconRefresh, IconCheck, IconX, IconAlertTriangle } from '@tabler/icons-react';
 import { v4 as uuidv4 } from 'uuid';
+import dayjs from 'dayjs';
 import { getArticles, getBatchesByArticle, createDraft } from '../../api/services';
 import { extractErrorMessage } from '../../api/services';
 import { useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../hooks/useAppSettings';
-import { LoadingState } from '../../components/common/LoadingState';
 
 export default function DraftEntry() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    const { settings } = useAppSettings();
+    useAppSettings();
 
     const form = useForm({
         initialValues: {
@@ -63,8 +63,15 @@ export default function DraftEntry() {
         queryKey: ['batches', selectedArticle?.article_no],
         queryFn: () => getBatchesByArticle(selectedArticle!.article_no),
         enabled: !!selectedArticle?.article_no,
-        select: (data) => data.items.map(b => ({ value: b.id.toString(), label: b.batch_code })),
     });
+
+    const batchOptions = batchesQuery.data?.items.map(b => ({
+        value: b.id.toString(),
+        label: `${b.batch_code} ${b.expiry_date ? `(Exp: ${dayjs(b.expiry_date).format('DD.MM.YYYY')})` : ''}`
+    })) || [];
+
+    const selectedBatch = batchesQuery.data?.items.find(b => b.id.toString() === form.values.batch_id);
+    const isBatchExpired = selectedBatch?.expiry_date && dayjs(selectedBatch.expiry_date).isBefore(dayjs());
 
     // Create Draft Mutation
     const mutation = useMutation({
@@ -136,12 +143,20 @@ export default function DraftEntry() {
                         <Select
                             label="Batch"
                             placeholder={!form.values.article_id ? "Select an article first" : "Select batch"}
-                            data={batchesQuery.data || []}
+                            data={batchOptions}
                             searchable
                             disabled={!form.values.article_id || batchesQuery.isLoading}
                             {...form.getInputProps('batch_id')}
                             required
+                            error={isBatchExpired ? 'Selected batch is EXPIRED!' : null}
                         />
+
+                        {isBatchExpired && (
+                            <Alert icon={<IconAlertTriangle size={16} />} title="Warning: Expired Batch" color="red" variant="filled">
+                                This batch expired on {dayjs(selectedBatch.expiry_date).format('DD.MM.YYYY')}.
+                                You can still proceed, but this will be flagged.
+                            </Alert>
+                        )}
 
                         <NumberInput
                             label="Quantity (kg)"

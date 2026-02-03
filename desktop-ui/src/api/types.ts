@@ -1,30 +1,23 @@
-// API Data Types matching Backend DTOs
-
+// Basic Types
 export interface Article {
     id: number;
     article_no: string;
-    description: string | null;
-    article_group: string | null; // e.g., "Paints", "Consumables" 
-    base_uom: string;
-    pack_size: number | null;
-    pack_uom: string | null;
-    barcode: string | null;
+    description: string;
     is_paint: boolean;
     is_active: boolean;
-    created_at: string;
-    updated_at: string | null;
+    // V1.2 Enhanced Fields
+    uom?: 'KG' | 'L';
+    manufacturer?: string;
+    manufacturer_art_number?: string;
+    reorder_threshold?: number;
+    created_at?: string;
 }
 
-export interface CreateArticleRequest {
-    article_no: string;
-    description?: string;
-    article_group?: string;
-    base_uom?: string;
-    pack_size?: number;
-    pack_uom?: string;
-    barcode?: string;
-    is_paint?: boolean;
-    is_active?: boolean;
+export interface Alias {
+    id: number;
+    article_id: number;
+    alias: string;
+    created_at: string;
 }
 
 export interface Batch {
@@ -32,16 +25,9 @@ export interface Batch {
     article_id: number;
     batch_code: string;
     is_active: boolean;
+    expiry_date?: string; // V1.2
     created_at: string;
-    updated_at: string | null;
 }
-
-export interface CreateBatchRequest {
-    article_id: number;
-    batch_code: string;
-}
-
-export type DraftStatus = 'DRAFT' | 'APPROVED' | 'REJECTED';
 
 export interface WeighInDraft {
     id: number;
@@ -49,26 +35,87 @@ export interface WeighInDraft {
     article_id: number;
     batch_id: number;
     quantity_kg: number;
+    status: 'DRAFT' | 'APPROVED' | 'REJECTED';
+    source: string;
+    created_by_user_id?: number | null;
     client_event_id: string;
-    status: DraftStatus;
+    note?: string;
     created_at: string;
-    updated_at: string | null;
-
-    // Relations (might be included if backend serializer supports nested, otherwise IDs)
-    // Backend DraftSchema likely doesn't nest full objects, but we'll see.
-    // We might need to join client-side if needed.
 }
 
-export interface CreateDraftRequest {
+export interface InventoryItem {
+    location_id: number;
+    location_code: string;
+    article_id: number;
+    article_no: string;
+    description?: string;
+    batch_id: number;
+    batch_code: string;
+    expiry_date?: string;
+    stock_qty: number;
+    surplus_qty: number;
+    total_qty: number;
+    updated_at?: string;
+}
+
+export interface Transaction {
+    id: number;
+    tx_type: string;
+    occurred_at: string;
     location_id: number;
     article_id: number;
     batch_id: number;
-    quantity_kg: number; // Decimal
-    client_event_id: string; // UUID
-    note?: string;
+    quantity_kg: number;
+    user_id?: number;
+    source: string;
+    // Denormalized
+    article_no?: string;
+    batch_code?: string;
+    location_code?: string;
 }
 
-export interface ApprovalRequest {
+// API Responses
+export interface PaginatedResponse<T> {
+    items: T[];
+    total: number;
+}
+
+export interface ArticlesResponse extends PaginatedResponse<Article> { }
+export interface DraftsResponse extends PaginatedResponse<WeighInDraft> { }
+export interface BatchesResponse extends PaginatedResponse<Batch> { }
+export interface AliasesResponse extends PaginatedResponse<Alias> { }
+export interface InventoryResponse extends PaginatedResponse<InventoryItem> { }
+export interface TransactionsResponse extends PaginatedResponse<Transaction> { }
+
+// API Payloads
+export interface CreateArticlePayload {
+    article_no: string;
+    description: string;
+    is_paint: boolean;
+    is_active: boolean;
+    // V1.2
+    uom?: 'KG' | 'L';
+    manufacturer?: string;
+    manufacturer_art_number?: string;
+    reorder_threshold?: number;
+}
+
+export interface CreateBatchPayload {
+    article_id: number;
+    batch_code: string;
+    expiry_date?: string; // YYYY-MM-DD
+}
+
+export interface CreateDraftPayload {
+    location_id: number;
+    article_id: number;
+    batch_id: number;
+    quantity_kg: number;
+    client_event_id: string;
+    source?: string;
+}
+
+export interface ApprovalPayload {
     note?: string;
 }
 
@@ -81,12 +128,19 @@ export interface ApprovalResponse {
     action?: any;
 }
 
-export interface ErrorDetails {
-    code: string;
-    message: string;
-    details?: Record<string, any>;
+export interface ApiErrorResponse {
+    error: {
+        code: string;
+        message: string;
+        details?: Record<string, any>;
+    };
 }
 
-export interface ApiErrorResponse {
-    error: ErrorDetails;
+export interface InventoryCountPayload {
+    location_id?: number;
+    article_id: number;
+    batch_id: number;
+    counted_total_qty: number;
+    note?: string;
+    client_event_id?: string;
 }

@@ -9,41 +9,12 @@ from ..error_handling import AppError, InsufficientStockError
 
 
 def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None) -> dict:
-    """Approve a weigh-in draft with atomic surplus-first consumption.
+    """Approve a draft.
     
-    This function implements the complete approval workflow:
-    1. Validates draft exists and is in DRAFT status
-    2. Validates actor user exists
-    3. Locks inventory rows (surplus, stock) FOR UPDATE
-    4. Applies surplus-first consumption logic
-    5. Creates transaction records
-    6. Updates draft status
-    7. Creates approval action
-    
-    All operations are atomic - on any error, the entire transaction rolls back.
-    
-    Args:
-        draft_id: ID of the draft to approve
-        actor_user_id: ID of the user performing the approval
-        note: Optional note for the approval action
-        
-    Returns:
-        dict with approval result:
-        {
-            'draft_id': int,
-            'new_status': 'APPROVED',
-            'consumed_surplus_kg': float,
-            'consumed_stock_kg': float,
-            'transactions': list[dict]
-        }
-        
-    Raises:
-        AppError: If draft not found or not in DRAFT status
-        AppError: If actor user not found  
-        InsufficientStockError: If combined stock + surplus is insufficient
+    Delegates to specific handler based on draft_type:
+    - WEIGH_IN: surplus-first consumption (existing logic)
+    - INVENTORY_SHORTAGE: stock-only consumption (new logic)
     """
-    now = datetime.now(timezone.utc)
-    
     # 1. Lock draft FOR UPDATE and validate
     draft = db.session.query(WeighInDraft).filter_by(
         id=draft_id
@@ -63,6 +34,18 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
     user = User.query.get(actor_user_id)
     if not user:
         raise AppError('USER_NOT_FOUND', f'User {actor_user_id} not found')
+        
+    # Delegate based on type
+    if draft.draft_type == WeighInDraft.DRAFT_TYPE_INVENTORY_SHORTAGE:
+        return _approve_shortage_draft(draft, actor_user_id, note)
+    else:
+        # Default to WEIGH_IN logic
+        return _approve_weigh_in_draft(draft, actor_user_id, note)
+
+
+def _approve_weigh_in_draft(draft, actor_user_id, note=None):
+    """Surplus-first consumption logic for WEIGH_IN drafts."""
+    now = datetime.now(timezone.utc)
     
     # 3. Lock or create surplus row FOR UPDATE
     surplus = db.session.query(Surplus).filter_by(
@@ -120,7 +103,6 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
     surplus.updated_at = now
     
     stock.quantity_kg = stock_qty - remaining
-    # stock.last_updated auto-updates via onupdate
     
     # 8. Create transaction records
     transactions_created = []
@@ -136,7 +118,7 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
         user_id=actor_user_id,
         source=draft.source,
         client_event_id=draft.client_event_id,
-        meta={'draft_id': draft_id}
+        meta={'draft_id': draft.id}
     )
     db.session.add(tx_weigh_in)
     transactions_created.append(tx_weigh_in)
@@ -149,11 +131,11 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
             location_id=draft.location_id,
             article_id=draft.article_id,
             batch_id=draft.batch_id,
-            quantity_kg=-use_surplus,  # Negative for consumption
+            quantity_kg=-use_surplus,
             user_id=actor_user_id,
             source='approval',
             client_event_id=draft.client_event_id,
-            meta={'draft_id': draft_id}
+            meta={'draft_id': draft.id}
         )
         db.session.add(tx_surplus)
         transactions_created.append(tx_surplus)
@@ -166,11 +148,11 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
             location_id=draft.location_id,
             article_id=draft.article_id,
             batch_id=draft.batch_id,
-            quantity_kg=-remaining,  # Negative for consumption
+            quantity_kg=-remaining,
             user_id=actor_user_id,
             source='approval',
             client_event_id=draft.client_event_id,
-            meta={'draft_id': draft_id}
+            meta={'draft_id': draft.id}
         )
         db.session.add(tx_stock)
         transactions_created.append(tx_stock)
@@ -181,7 +163,7 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
     
     # 10. Create approval action
     approval_action = ApprovalAction(
-        draft_id=draft_id,
+        draft_id=draft.id,
         action='APPROVE',
         actor_user_id=actor_user_id,
         old_value={'status': old_status},
@@ -194,17 +176,98 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
     )
     db.session.add(approval_action)
     
-    # Flush to get IDs before returning
     db.session.flush()
     
     return {
-        'draft_id': draft_id,
+        'draft_id': draft.id,
         'new_status': WeighInDraft.STATUS_APPROVED,
         'consumed_surplus_kg': float(use_surplus),
         'consumed_stock_kg': float(remaining),
         'remaining_surplus_kg': float(surplus.quantity_kg),
         'remaining_stock_kg': float(stock.quantity_kg),
         'transactions': [tx.to_dict() for tx in transactions_created],
+        'approval_action': approval_action.to_dict()
+    }
+
+
+def _approve_shortage_draft(draft, actor_user_id, note=None):
+    """Stock-only consumption logic for INVENTORY_SHORTAGE drafts.
+    
+    Never touches surplus.
+    If stock is insufficient -> INSUFFICIENT_STOCK error.
+    """
+    now = datetime.now(timezone.utc)
+    
+    # Lock stock row
+    stock = db.session.query(Stock).filter_by(
+        location_id=draft.location_id,
+        article_id=draft.article_id,
+        batch_id=draft.batch_id
+    ).with_for_update().first()
+    
+    stock_qty = Decimal('0')
+    if stock:
+        stock_qty = Decimal(str(stock.quantity_kg))
+    
+    draft_qty = Decimal(str(draft.quantity_kg))
+    
+    # Validate stock sufficiency
+    if stock_qty < draft_qty:
+        raise InsufficientStockError(
+            required=float(draft_qty),
+            available=float(stock_qty),
+            available_surplus=0  # Shortage approval doesn't use surplus
+        )
+    
+    # Reduce stock
+    stock.quantity_kg = stock_qty - draft_qty
+    
+    # Create INVENTORY_ADJUSTMENT transaction (negative)
+    tx = Transaction(
+        tx_type=Transaction.TX_INVENTORY_ADJUSTMENT,
+        occurred_at=now,
+        location_id=draft.location_id,
+        article_id=draft.article_id,
+        batch_id=draft.batch_id,
+        quantity_kg=-draft_qty,
+        user_id=actor_user_id,
+        source='shortage_approval',
+        client_event_id=draft.client_event_id,
+        meta={
+            'draft_id': draft.id,
+            'reason': 'inventory_shortage_approved'
+        }
+    )
+    db.session.add(tx)
+    
+    # Update draft status
+    old_status = draft.status
+    draft.status = WeighInDraft.STATUS_APPROVED
+    
+    # Create approval action
+    approval_action = ApprovalAction(
+        draft_id=draft.id,
+        action='APPROVE',
+        actor_user_id=actor_user_id,
+        old_value={'status': old_status},
+        new_value={
+            'status': WeighInDraft.STATUS_APPROVED,
+            'consumed_stock_kg': float(draft_qty),
+            'consumed_surplus_kg': 0.0
+        },
+        note=note
+    )
+    db.session.add(approval_action)
+    
+    db.session.flush()
+    
+    return {
+        'draft_id': draft.id,
+        'new_status': WeighInDraft.STATUS_APPROVED,
+        'consumed_surplus_kg': 0.0,
+        'consumed_stock_kg': float(draft_qty),
+        'remaining_stock_kg': float(stock.quantity_kg),
+        'transactions': [tx.to_dict()],
         'approval_action': approval_action.to_dict()
     }
 

@@ -6,7 +6,7 @@ from flask_jwt_extended import jwt_required
 from ..extensions import db
 from ..auth import require_roles
 from ..models import Batch, Article
-from ..services.validation import validate_batch_code
+
 from ..schemas.batches import BatchSchema, BatchCreateSchema, BatchListSchema
 from ..schemas.common import ErrorResponseSchema
 
@@ -73,16 +73,8 @@ class BatchList(MethodView):
         Requires ADMIN role.
         Batch code must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).
         """
-        # Validate batch code format using service
+        # Validate batch code format is handled by Schema
         batch_code = batch_data['batch_code']
-        if not validate_batch_code(batch_code):
-            return {
-                'error': {
-                    'code': 'INVALID_BATCH_FORMAT',
-                    'message': f'Invalid batch code format: {batch_code}. Must be 4-5 or 9-12 digits',
-                    'details': {'batch_code': batch_code}
-                }
-            }, 400
         
         # Check article exists
         article = db.session.get(Article, batch_data['article_id'])

@@ -15,6 +15,7 @@ class DraftSchema(Schema):
     batch_id = fields.Integer(required=True)
     quantity_kg = fields.Float(required=True)
     status = fields.String(dump_only=True)
+    draft_type = fields.String(dump_only=True, metadata={'description': 'WEIGH_IN or INVENTORY_SHORTAGE'})
     created_by_user_id = fields.Integer(allow_none=True)
     source = fields.String(dump_default='manual')
     client_event_id = fields.String(required=True)
@@ -87,6 +88,10 @@ class DraftQuerySchema(Schema):
     status = fields.String(
         validate=validate.OneOf(['DRAFT', 'APPROVED', 'REJECTED']),
         metadata={'description': 'Filter by status'}
+    )
+    draft_type = fields.String(
+        validate=validate.OneOf(['WEIGH_IN', 'INVENTORY_SHORTAGE']),
+        metadata={'description': 'Filter by draft type'}
     )
     location_id = fields.Integer(metadata={'description': 'Filter by location'})
     article_id = fields.Integer(metadata={'description': 'Filter by article'})

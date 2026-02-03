@@ -1,35 +1,48 @@
 import { useState } from 'react';
 import {
-    Container, Paper, Title, Table, Button, Group, Text, Alert,
-    Modal, TextInput, Select, Stack, LoadingOverlay, Badge
+    Container, Title, Paper, Group, Button, Select, TextInput,
+    Text, Box, Table, Badge, LoadingOverlay
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
+import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconPlus, IconBox, IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react';
-import { Article, Batch } from '../api/types';
+import { IconPlus, IconCheck, IconX } from '@tabler/icons-react';
 import { getArticles, getBatchesByArticle, createBatch, extractErrorMessage } from '../api/services';
-import { LoadingState } from '../components/common/LoadingState';
 import { EmptyState } from '../components/common/EmptyState';
+import dayjs from 'dayjs';
 
 export default function Batches() {
     const queryClient = useQueryClient();
-    const [opened, { open, close }] = useDisclosure(false);
     const [selectedArticleNo, setSelectedArticleNo] = useState<string | null>(null);
 
-    // Fetch Articles for dropdown
-    const articlesQuery = useQuery({
-        queryKey: ['articles', 'true'],
-        queryFn: () => getArticles('true'),
-        select: (data) => data.items.map((a: Article) => ({
-            value: a.article_no,
-            label: `${a.article_no} - ${a.description}`,
-            id: a.id // Need ID for create
-        })),
+    const form = useForm({
+        initialValues: {
+            article_id: '',
+            batch_code: '',
+            expiry_date: null as Date | null,
+        },
+        validate: {
+            article_id: (value) => !value ? 'Article is required' : null,
+            batch_code: (value) => {
+                if (!value) return 'Batch code is required';
+                // Strict validation: 4 digits OR 9-12 digits
+                if (!/^\d{4}$|^\d{9,12}$/.test(value)) {
+                    return 'Code must be 4 digits (Mankiewicz) or 9-12 digits (Akzo)';
+                }
+                return null;
+            },
+            expiry_date: (value) => !value ? 'Expiry date is required' : null, // Optional in backend but mandatory in UI per spec
+        },
     });
 
-    // Fetch Batches for selected article
+    // Fetch active articles for dropdown
+    const articlesQuery = useQuery({
+        queryKey: ['articles', 'active'],
+        queryFn: () => getArticles('true'),
+    });
+
+    // Fetch batches when article is selected
     const batchesQuery = useQuery({
         queryKey: ['batches', selectedArticleNo],
         queryFn: () => getBatchesByArticle(selectedArticleNo!),
@@ -38,143 +51,149 @@ export default function Batches() {
 
     const createMutation = useMutation({
         mutationFn: createBatch,
-        onSuccess: (data) => {
+        onSuccess: () => {
             notifications.show({
                 title: 'Success',
-                message: `Created batch ${data.batch_code} for article ${selectedArticleNo}`,
+                message: 'Batch created successfully',
                 color: 'green',
-                icon: <IconCheck size={16} />,
+                icon: <IconCheck size="1.1rem" />,
             });
-            queryClient.invalidateQueries({ queryKey: ['batches', selectedArticleNo] });
-            close();
             form.reset();
+            // Preserve selected article
+            if (selectedArticleNo) {
+                const article = articlesQuery.data?.items.find(a => a.article_no === selectedArticleNo);
+                if (article) form.setFieldValue('article_id', article.id.toString());
+            }
+            queryClient.invalidateQueries({ queryKey: ['batches', selectedArticleNo] });
         },
-        onError: (err) => {
+        onError: (error) => {
             notifications.show({
                 title: 'Error',
-                message: extractErrorMessage(err),
+                message: extractErrorMessage(error),
                 color: 'red',
-                icon: <IconX size={16} />,
+                icon: <IconX size="1.1rem" />,
             });
-        }
-    });
-
-    const form = useForm({
-        initialValues: {
-            batch_code: '',
-        },
-        validate: {
-            batch_code: (val) => {
-                const trimmed = val.trim();
-                if (!/^\d+$/.test(trimmed)) return 'Digits only';
-                const len = trimmed.length;
-                if (!((len >= 4 && len <= 5) || (len >= 9 && len <= 12))) {
-                    return 'Must be 4-5 or 9-12 digits';
-                }
-                return null;
-            },
         },
     });
 
-    const handleSubmit = (values: typeof form.values) => {
-        // Find article ID
-        const article = articlesQuery.data?.find((a: any) => a.value === selectedArticleNo);
-        if (!article) return;
-
+    const handleSubmit = form.onSubmit((values) => {
         createMutation.mutate({
-            article_id: article.id,
-            batch_code: values.batch_code.trim()
+            article_id: parseInt(values.article_id),
+            batch_code: values.batch_code,
+            expiry_date: values.expiry_date ? dayjs(values.expiry_date).format('YYYY-MM-DD') : undefined
         });
+    });
+
+    // Handle Article Change
+    const handleArticleChange = (value: string | null) => {
+        form.setFieldValue('article_id', value || '');
+        if (value) {
+            const article = articlesQuery.data?.items.find(a => a.id.toString() === value);
+            setSelectedArticleNo(article?.article_no || null);
+        } else {
+            setSelectedArticleNo(null);
+        }
     };
 
-    const rows = batchesQuery.data?.items.map((batch: Batch) => (
-        <Table.Tr key={batch.id}>
-            <Table.Td>{batch.id}</Table.Td>
-            <Table.Td fw={700}>{batch.batch_code}</Table.Td>
-            <Table.Td>
-                {batch.is_active ? <Badge color="green" variant="dot">Active</Badge> : <Badge color="gray">Inactive</Badge>}
-            </Table.Td>
-            <Table.Td>{new Date(batch.created_at).toLocaleDateString()}</Table.Td>
-        </Table.Tr>
-    ));
+    const isSubmitting = createMutation.isPending;
 
     return (
-        <Container size="lg" py="xl">
-            <Group justify="space-between" mb="lg">
-                <Title order={2}>Batches</Title>
-                <Button
-                    leftSection={<IconPlus size={16} />}
-                    onClick={open}
-                    disabled={!selectedArticleNo}
-                >
-                    New Batch
-                </Button>
-            </Group>
+        <Container size="xl">
+            <Title order={2} mb="xl">Batch Management</Title>
 
-            <Paper shadow="xs" p="md" withBorder mb="lg">
-                <Select
-                    label="Select Article to view batches"
-                    placeholder="Search article..."
-                    data={articlesQuery.data || []}
-                    searchable
-                    value={selectedArticleNo}
-                    onChange={setSelectedArticleNo}
-                    leftSection={<IconBox size={16} />}
-                />
-            </Paper>
-
-            <Paper shadow="xs" p="md" withBorder pos="relative" minH={200}>
-                <LoadingOverlay visible={batchesQuery.isLoading && !!selectedArticleNo} overlayProps={{ radius: "sm", blur: 2 }} />
-
-                {!selectedArticleNo ? (
-                    <EmptyState message="Please select an article to view batches" />
-                ) : batchesQuery.isError ? (
-                    <Alert color="red" title="Error" icon={<IconAlertCircle size={16} />}>
-                        {extractErrorMessage(batchesQuery.error)}
-                    </Alert>
-                ) : batchesQuery.data?.items.length === 0 ? (
-                    <EmptyState message="No batches found for this article" />
-                ) : (
-                    <Table striped highlightOnHover>
-                        <Table.Thead>
-                            <Table.Tr>
-                                <Table.Th>ID</Table.Th>
-                                <Table.Th>Batch Code</Table.Th>
-                                <Table.Th>Status</Table.Th>
-                                <Table.Th>Created</Table.Th>
-                            </Table.Tr>
-                        </Table.Thead>
-                        <Table.Tbody>{rows}</Table.Tbody>
-                    </Table>
-                )}
-            </Paper>
-
-            <Modal opened={opened} onClose={close} title={`New Batch for ${selectedArticleNo}`} centered>
-                <form onSubmit={form.onSubmit(handleSubmit)}>
-                    <Stack>
-                        <LoadingOverlay visible={createMutation.isPending} zIndex={1000} />
+            <Group align="flex-start" gap="xl">
+                {/* Create Form */}
+                <Paper shadow="xs" p="md" withBorder style={{ width: 350, flexShrink: 0 }}>
+                    <Title order={4} mb="md">New Batch</Title>
+                    <form onSubmit={handleSubmit}>
+                        <Select
+                            label="Article"
+                            placeholder="Select article"
+                            data={articlesQuery.data?.items.map(a => ({
+                                value: a.id.toString(),
+                                label: `${a.article_no} - ${a.description}`
+                            })) || []}
+                            searchable
+                            mb="md"
+                            {...form.getInputProps('article_id')}
+                            onChange={handleArticleChange}
+                            disabled={isSubmitting}
+                        />
 
                         <TextInput
                             label="Batch Code"
-                            placeholder="Numeric code"
-                            description="4-5 digits (Mankiewicz) or 9-12 digits (Akzo)"
-                            withAsterisk
+                            placeholder="Scan or type code"
+                            mb="md"
                             {...form.getInputProps('batch_code')}
                         />
 
-                        {createMutation.isError && (
-                            <Alert icon={<IconAlertCircle size={16} />} color="red">
-                                {extractErrorMessage(createMutation.error)}
-                            </Alert>
-                        )}
+                        <DatePickerInput
+                            label="Expiry Date"
+                            placeholder="Pick date"
+                            valueFormat="DD.MM.YYYY"
+                            mb="xl"
+                            {...form.getInputProps('expiry_date')}
+                        />
 
-                        <Group justify="flex-end" mt="md">
-                            <Button variant="default" onClick={close}>Cancel</Button>
-                            <Button type="submit" loading={createMutation.isPending}>Create Batch</Button>
-                        </Group>
-                    </Stack>
-                </form>
-            </Modal>
+                        <Button
+                            fullWidth
+                            leftSection={<IconPlus size={16} />}
+                            type="submit"
+                            loading={isSubmitting}
+                        >
+                            Create Batch
+                        </Button>
+                    </form>
+                </Paper>
+
+                {/* Batches List */}
+                <Paper shadow="xs" p="md" withBorder style={{ flex: 1 }} pos="relative" mih={400}>
+                    <LoadingOverlay visible={batchesQuery.isLoading} />
+
+                    {!selectedArticleNo ? (
+                        <Box h={300} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Text c="dimmed" size="lg">Select an article to view batches</Text>
+                        </Box>
+                    ) : batchesQuery.data?.items.length === 0 ? (
+                        <EmptyState message="No batches found for this article" />
+                    ) : (
+                        <Table striped highlightOnHover>
+                            <Table.Thead>
+                                <Table.Tr>
+                                    <Table.Th>Batch Code</Table.Th>
+                                    <Table.Th>Expiry Date</Table.Th>
+                                    <Table.Th>Created</Table.Th>
+                                    <Table.Th>Status</Table.Th>
+                                </Table.Tr>
+                            </Table.Thead>
+                            <Table.Tbody>
+                                {batchesQuery.data?.items.map((batch) => {
+                                    const isExpired = batch.expiry_date && dayjs(batch.expiry_date).isBefore(dayjs());
+                                    return (
+                                        <Table.Tr key={batch.id}>
+                                            <Table.Td fw={700}>{batch.batch_code}</Table.Td>
+                                            <Table.Td>
+                                                <Text c={isExpired ? 'red' : undefined} fw={isExpired ? 700 : 400}>
+                                                    {batch.expiry_date ? dayjs(batch.expiry_date).format('DD.MM.YYYY') : '-'}
+                                                </Text>
+                                            </Table.Td>
+                                            <Table.Td>{dayjs(batch.created_at).format('DD.MM.YYYY')}</Table.Td>
+                                            <Table.Td>
+                                                <Badge
+                                                    color={batch.is_active ? 'green' : 'gray'}
+                                                    variant={batch.is_active ? 'light' : 'outline'}
+                                                >
+                                                    {batch.is_active ? 'Active' : 'Archived'}
+                                                </Badge>
+                                            </Table.Td>
+                                        </Table.Tr>
+                                    );
+                                })}
+                            </Table.Tbody>
+                        </Table>
+                    )}
+                </Paper>
+            </Group>
         </Container>
     );
 }

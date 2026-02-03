@@ -2,6 +2,7 @@
 from .user import User
 from .location import Location
 from .article import Article
+from .article_alias import ArticleAlias
 from .batch import Batch
 from .stock import Stock
 from .surplus import Surplus
@@ -13,6 +14,7 @@ __all__ = [
     'User',
     'Location',
     'Article',
+    'ArticleAlias',
     'Batch',
     'Stock',
     'Surplus',
@@ -20,3 +22,4 @@ __all__ = [
     'ApprovalAction',
     'Transaction',
 ]
+

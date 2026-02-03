@@ -1,21 +1,103 @@
 import { useState } from 'react';
 import {
     Container, Paper, Title, Table, Button, Group, Alert,
-    Modal, TextInput, Checkbox, Badge, ActionIcon, Menu, Tabs, Stack, LoadingOverlay
+    Modal, TextInput, Checkbox, Badge, ActionIcon, Menu, Tabs, Stack, LoadingOverlay,
+    NumberInput, Select, Text, Box
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconSearch, IconDotsVertical, IconPlus, IconArchive, IconRestore, IconTrash, IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
-import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle } from '../api/services';
-import { Article } from '../api/types';
+import { IconSearch, IconDotsVertical, IconPlus, IconArchive, IconRestore, IconTrash, IconCheck, IconX, IconAlertCircle, IconTag } from '@tabler/icons-react';
+import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle, getAliases, createAlias, deleteAlias } from '../api/services';
+import { Article, Alias } from '../api/types';
 import { LoadingState } from '../components/common/LoadingState';
 import { EmptyState } from '../components/common/EmptyState';
+
+// --- Aliases Modal Component ---
+function AliasesModal({ article, opened, onClose }: { article: Article | null, opened: boolean, onClose: () => void }) {
+    const queryClient = useQueryClient();
+    const [newAlias, setNewAlias] = useState('');
+
+    const { data, isLoading } = useQuery({
+        queryKey: ['aliases', article?.id],
+        queryFn: () => getAliases(article!.id),
+        enabled: !!article,
+    });
+
+    const createMutation = useMutation({
+        mutationFn: (alias: string) => createAlias(article!.id, alias),
+        onSuccess: () => {
+            notifications.show({ title: 'Success', message: 'Alias added', color: 'green' });
+            setNewAlias('');
+            queryClient.invalidateQueries({ queryKey: ['aliases', article?.id] });
+        },
+        onError: (err) => notifications.show({ title: 'Error', message: extractErrorMessage(err), color: 'red' })
+    });
+
+    const deleteMutation = useMutation({
+        mutationFn: (aliasId: number) => deleteAlias(article!.id, aliasId),
+        onSuccess: () => {
+            notifications.show({ title: 'Success', message: 'Alias deleted', color: 'green' });
+            queryClient.invalidateQueries({ queryKey: ['aliases', article?.id] });
+        },
+        onError: (err) => notifications.show({ title: 'Error', message: extractErrorMessage(err), color: 'red' })
+    });
+
+    const handleAdd = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newAlias.trim()) return;
+        createMutation.mutate(newAlias.trim());
+    };
+
+    return (
+        <Modal opened={opened} onClose={onClose} title={`Aliases for ${article?.article_no}`} centered>
+            <Stack>
+                <form onSubmit={handleAdd}>
+                    <Group>
+                        <TextInput
+                            placeholder="New alias code..."
+                            value={newAlias}
+                            onChange={(e) => setNewAlias(e.currentTarget.value)}
+                            style={{ flex: 1 }}
+                            disabled={createMutation.isPending}
+                        />
+                        <Button type="submit" loading={createMutation.isPending}>Add</Button>
+                    </Group>
+                </form>
+
+                <Box mih={200} pos="relative">
+                    <LoadingOverlay visible={isLoading || deleteMutation.isPending} />
+                    {data?.items.length === 0 ? (
+                        <Text c="dimmed" ta="center" py="xl">No aliases found.</Text>
+                    ) : (
+                        <Table>
+                            <Table.Thead><Table.Tr><Table.Th>Alias</Table.Th><Table.Th w={50}></Table.Th></Table.Tr></Table.Thead>
+                            <Table.Tbody>
+                                {data?.items.map((a: Alias) => (
+                                    <Table.Tr key={a.id}>
+                                        <Table.Td>{a.alias}</Table.Td>
+                                        <Table.Td>
+                                            <ActionIcon color="red" variant="subtle" onClick={() => deleteMutation.mutate(a.id)}>
+                                                <IconTrash size={16} />
+                                            </ActionIcon>
+                                        </Table.Td>
+                                    </Table.Tr>
+                                ))}
+                            </Table.Tbody>
+                        </Table>
+                    )}
+                </Box>
+            </Stack>
+        </Modal>
+    );
+}
 
 export default function Articles() {
     const queryClient = useQueryClient();
     const [opened, { open, close }] = useDisclosure(false);
+    const [aliasesOpened, { open: openAliases, close: closeAliases }] = useDisclosure(false);
+    const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
     const [filter, setFilter] = useState('');
     const [activeTab, setActiveTab] = useState<string | null>('active');
 
@@ -30,6 +112,10 @@ export default function Articles() {
         initialValues: {
             article_no: '',
             description: '',
+            uom: 'KG',
+            manufacturer: '',
+            manufacturer_art_number: '',
+            reorder_threshold: 0,
             is_paint: false,
             is_active: true,
         },
@@ -94,6 +180,11 @@ export default function Articles() {
         }
     };
 
+    const openAliasesModal = (article: Article) => {
+        setSelectedArticle(article);
+        openAliases();
+    };
+
     const filteredItems = data?.items.filter((item: Article) =>
         item.article_no.toLowerCase().includes(filter.toLowerCase()) ||
         (item.description || '').toLowerCase().includes(filter.toLowerCase())
@@ -103,6 +194,7 @@ export default function Articles() {
         <Table.Tr key={article.id} style={{ opacity: article.is_active ? 1 : 0.6 }}>
             <Table.Td>{article.article_no}</Table.Td>
             <Table.Td>{article.description}</Table.Td>
+            <Table.Td>{article.uom || '-'}</Table.Td>
             <Table.Td>
                 {article.is_paint ? <Badge color="blue" variant="light">Paint</Badge> : <Badge color="gray" variant="light">Consumable</Badge>}
             </Table.Td>
@@ -118,6 +210,10 @@ export default function Articles() {
                         <ActionIcon variant="subtle" color="gray"><IconDotsVertical size={16} /></ActionIcon>
                     </Menu.Target>
                     <Menu.Dropdown>
+                        <Menu.Item leftSection={<IconTag size={14} />} onClick={() => openAliasesModal(article)}>
+                            Manage Aliases
+                        </Menu.Item>
+                        <Menu.Divider />
                         {article.is_active ? (
                             <Menu.Item leftSection={<IconArchive size={14} />} onClick={() => handleAction(article.id, 'archive')}>
                                 Archive
@@ -127,7 +223,6 @@ export default function Articles() {
                                 Restore
                             </Menu.Item>
                         )}
-                        <Menu.Divider />
                         <Menu.Item color="red" leftSection={<IconTrash size={14} />} onClick={() => handleAction(article.id, 'delete')}>
                             Delete
                         </Menu.Item>
@@ -179,6 +274,7 @@ export default function Articles() {
                             <Table.Tr>
                                 <Table.Th>Article No.</Table.Th>
                                 <Table.Th>Description</Table.Th>
+                                <Table.Th>UOM</Table.Th>
                                 <Table.Th>Type</Table.Th>
                                 <Table.Th>Status</Table.Th>
                                 <Table.Th style={{ width: 50 }}></Table.Th>
@@ -214,6 +310,29 @@ export default function Articles() {
                             {...form.getInputProps('description')}
                         />
 
+                        <Group grow>
+                            <Select
+                                label="UOM"
+                                data={['KG', 'L']}
+                                {...form.getInputProps('uom')}
+                            />
+                            <NumberInput
+                                label="Reorder Threshold"
+                                min={0}
+                                {...form.getInputProps('reorder_threshold')}
+                            />
+                        </Group>
+
+                        <TextInput
+                            label="Manufacturer"
+                            {...form.getInputProps('manufacturer')}
+                        />
+
+                        <TextInput
+                            label="Manufacturer Art. No."
+                            {...form.getInputProps('manufacturer_art_number')}
+                        />
+
                         <Checkbox
                             label="Is Paint?"
                             description="Check if this article is a paint product"
@@ -235,6 +354,12 @@ export default function Articles() {
                     </Stack>
                 </form>
             </Modal>
+
+            <AliasesModal
+                article={selectedArticle}
+                opened={aliasesOpened}
+                onClose={() => { closeAliases(); setSelectedArticle(null); }}
+            />
         </Container>
     );
 }

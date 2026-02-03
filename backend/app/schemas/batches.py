@@ -3,8 +3,8 @@ import re
 from marshmallow import Schema, fields, validate, validates, ValidationError
 
 
-# Batch code regex: 4 digits (Mankiewicz) or 9-10 digits (Akzo)
-BATCH_CODE_PATTERN = r'^\d{4}$|^\d{9,10}$'
+# Batch code regex: 4-5 digits (Mankiewicz) or 9-12 digits (Akzo)
+BATCH_CODE_PATTERN = r'^\d{4,5}$|^\d{9,12}$'
 
 
 class BatchSchema(Schema):
@@ -27,21 +27,19 @@ class BatchCreateSchema(Schema):
     )
     batch_code = fields.String(
         required=True,
-        metadata={'description': '4 digits (Mankiewicz) or 9-10 digits (Akzo)'}
+        validate=validate.Regexp(
+            BATCH_CODE_PATTERN,
+            error='Invalid batch code format. Must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).'
+        ),
+        metadata={'description': '4-5 digits (Mankiewicz) or 9-12 digits (Akzo)'}
     )
     received_date = fields.Date(allow_none=True)
-    expiry_date = fields.Date(allow_none=True)
+    expiry_date = fields.Date(
+        load_default=None,
+        metadata={'description': 'Batch expiry date (optional for backward compatibility)'}
+    )
     note = fields.String(allow_none=True, validate=validate.Length(max=500))
     is_active = fields.Boolean(load_default=True)
-    
-    @validates('batch_code')
-    def validate_batch_code(self, value):
-        """Validate batch code format."""
-        if not re.match(BATCH_CODE_PATTERN, value):
-            raise ValidationError(
-                f'Invalid batch code format. Must be 4 digits (Mankiewicz) '
-                f'or 9-10 digits (Akzo). Pattern: {BATCH_CODE_PATTERN}'
-            )
 
 
 class BatchListSchema(Schema):

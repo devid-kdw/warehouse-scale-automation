@@ -9,7 +9,6 @@ import { notifications } from '@mantine/notifications';
 import { IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
 import { getDrafts, approveDraft, rejectDraft, extractErrorMessage, getArticles } from '../../api/services';
 import { WeighInDraft, Article } from '../../api/types';
-import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
 
 export default function DraftApproval() {
@@ -51,7 +50,7 @@ export default function DraftApproval() {
                 return rejectDraft(selectedDraft.id, payload);
             }
         },
-        onSuccess: (data) => {
+        onSuccess: () => {
             notifications.show({
                 title: actionType === 'approve' ? 'Approved' : 'Rejected',
                 message: `Draft #${selectedDraft?.id} processed successfully.`,

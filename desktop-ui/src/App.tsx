@@ -11,6 +11,7 @@ import DraftApproval from './pages/Drafts/DraftApproval';
 import Articles from './pages/Articles';
 import Batches from './pages/Batches';
 import Inventory from './pages/Inventory';
+import Reports from './pages/Reports';
 import logo from './assets/enikon-logo.jpg';
 import {
     getAuthState,
@@ -135,6 +136,9 @@ function Layout() {
                     } />
                     <Route path="/inventory" element={
                         <RequireAdmin><Inventory /></RequireAdmin>
+                    } />
+                    <Route path="/reports" element={
+                        <RequireAdmin><Reports /></RequireAdmin>
                     } />
 
                     {/* Settings - both */}

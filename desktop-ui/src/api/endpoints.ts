@@ -28,7 +28,18 @@ export const API_ENDPOINTS = {
     },
 
     INVENTORY: {
-        // Note: No LIST endpoint exists.
+        SUMMARY: '/api/inventory/summary',
+        COUNT: '/api/inventory/count',
         ADJUST: '/api/inventory/adjust',
+    },
+
+    TRANSACTIONS: {
+        LIST: '/api/transactions',
+    },
+
+    ALIASES: {
+        LIST: (articleId: number) => `/api/articles/${articleId}/aliases`,
+        CREATE: (articleId: number) => `/api/articles/${articleId}/aliases`,
+        DELETE: (articleId: number, aliasId: number) => `/api/articles/${articleId}/aliases/${aliasId}`,
     }
 } as const;

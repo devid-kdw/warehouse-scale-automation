@@ -12,6 +12,11 @@ class ArticleSchema(Schema):
     pack_size = fields.Float(allow_none=True)
     pack_uom = fields.String(allow_none=True)
     barcode = fields.String(allow_none=True)
+    # New v1.2 fields
+    uom = fields.String(allow_none=True, metadata={'description': 'Unit of measure: KG or L'})
+    manufacturer = fields.String(allow_none=True)
+    manufacturer_art_number = fields.String(allow_none=True, metadata={'description': 'Vendor article number'})
+    reorder_threshold = fields.Float(allow_none=True, metadata={'description': 'Low stock alarm threshold'})
     is_paint = fields.Boolean(dump_default=True)
     is_active = fields.Boolean(dump_default=True)
     created_at = fields.DateTime(dump_only=True)
@@ -31,6 +36,15 @@ class ArticleCreateSchema(Schema):
     pack_size = fields.Float(allow_none=True, validate=validate.Range(min=0))
     pack_uom = fields.String(allow_none=True, validate=validate.Length(max=20))
     barcode = fields.String(allow_none=True, validate=validate.Length(max=100))
+    # New v1.2 fields
+    uom = fields.String(
+        allow_none=True,
+        validate=validate.OneOf(['KG', 'L']),
+        metadata={'description': 'Unit of measure: KG or L'}
+    )
+    manufacturer = fields.String(allow_none=True, validate=validate.Length(max=200))
+    manufacturer_art_number = fields.String(allow_none=True, validate=validate.Length(max=100))
+    reorder_threshold = fields.Float(allow_none=True, validate=validate.Range(min=0))
     is_paint = fields.Boolean(load_default=True)
     is_active = fields.Boolean(load_default=True)
 

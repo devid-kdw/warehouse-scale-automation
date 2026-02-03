@@ -39,6 +39,7 @@ class WeighInDraft(db.Model):
     source = db.Column(db.Text, nullable=False, default='manual')
     client_event_id = db.Column(db.Text, nullable=False, unique=True)
     note = db.Column(db.Text, nullable=True)
+    draft_type = db.Column(db.String(20), nullable=False, default='WEIGH_IN')  # WEIGH_IN or INVENTORY_SHORTAGE
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -74,6 +75,11 @@ class WeighInDraft(db.Model):
     STATUS_REJECTED = 'REJECTED'
     VALID_STATUSES = [STATUS_DRAFT, STATUS_APPROVED, STATUS_REJECTED]
     
+    # Valid draft_type values
+    DRAFT_TYPE_WEIGH_IN = 'WEIGH_IN'
+    DRAFT_TYPE_INVENTORY_SHORTAGE = 'INVENTORY_SHORTAGE'
+    VALID_DRAFT_TYPES = [DRAFT_TYPE_WEIGH_IN, DRAFT_TYPE_INVENTORY_SHORTAGE]
+    
     def __repr__(self):
         return f'<WeighInDraft {self.id} ({self.status})>'
     
@@ -85,6 +91,7 @@ class WeighInDraft(db.Model):
             'batch_id': self.batch_id,
             'quantity_kg': float(self.quantity_kg) if self.quantity_kg else None,
             'status': self.status,
+            'draft_type': self.draft_type,
             'created_by_user_id': self.created_by_user_id,
             'source': self.source,
             'client_event_id': self.client_event_id,
