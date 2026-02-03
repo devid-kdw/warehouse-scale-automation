@@ -9,7 +9,19 @@ warehouse-scale-automation/
 ├── backend/          # Flask API server
 ├── desktop-ui/       # Electron + React (future)
 └── docs/             # Documentation
+    ├── team/         # Team documentation (changelog, decisions, migrations)
+    ├── status/       # Weekly status reports
+    └── tasks/        # Task briefs
 ```
+
+## Documentation
+
+- **[Project Specification](./PROJECT_SPECIFICATION.md)** - Comprehensive technical specification
+- **[Changelog](./docs/team/CHANGELOG.md)** - All changes tracked with test instructions
+- **[Decisions](./docs/team/DECISIONS.md)** - Architectural and policy decisions
+- **[Migrations](./docs/team/MIGRATIONS.md)** - Database schema evolution
+- **[Release Checklist](./docs/team/RELEASE_CHECKLIST.md)** - Pre-release verification steps
+- **[Status Reports](./docs/status/)** - Weekly progress updates
 
 ## Quick Start
 
