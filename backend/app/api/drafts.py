@@ -2,9 +2,10 @@
 from decimal import Decimal, ROUND_HALF_UP
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
-from ..auth import require_token
+from ..auth import require_roles
 from ..models import WeighInDraft, Location, Article, Batch
 from ..schemas.drafts import (
     DraftSchema, DraftCreateSchema, DraftUpdateSchema,
@@ -28,11 +29,12 @@ class DraftList(MethodView):
     @blp.arguments(DraftQuerySchema, location='query')
     @blp.response(200, DraftListSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
-    @require_token
+    @jwt_required()
     def get(self, query_args):
         """List drafts.
         
         Filter by status, location_id, or article_id.
+        Accessible by ADMIN and OPERATOR.
         """
         query = WeighInDraft.query
         
@@ -57,15 +59,20 @@ class DraftList(MethodView):
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Location/Article/Batch not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Duplicate client_event_id')
-    @require_token
+    @jwt_required()
     def post(self, draft_data):
         """Create a new draft.
         
+        Accessible by ADMIN and OPERATOR.
+        Uses JWT identity as created_by_user_id.
         Requires client_event_id for idempotency.
         Quantity must be between 0.01 and 9999.99 kg.
         """
+        # Get user from JWT
+        current_user_id = get_jwt_identity()
+        
         # Validate location exists
-        location = Location.query.get(draft_data['location_id'])
+        location = db.session.get(Location, draft_data['location_id'])
         if not location:
             return {
                 'error': {
@@ -76,7 +83,7 @@ class DraftList(MethodView):
             }, 404
         
         # Validate article exists
-        article = Article.query.get(draft_data['article_id'])
+        article = db.session.get(Article, draft_data['article_id'])
         if not article:
             return {
                 'error': {
@@ -87,7 +94,7 @@ class DraftList(MethodView):
             }, 404
         
         # Validate batch exists
-        batch = Batch.query.get(draft_data['batch_id'])
+        batch = db.session.get(Batch, draft_data['batch_id'])
         if not batch:
             return {
                 'error': {
@@ -117,6 +124,9 @@ class DraftList(MethodView):
         )
         draft_data['quantity_kg'] = quantity
         
+        # Set created_by from JWT
+        draft_data['created_by_user_id'] = current_user_id
+        
         draft = WeighInDraft(**draft_data)
         db.session.add(draft)
         db.session.commit()
@@ -132,10 +142,10 @@ class DraftDetail(MethodView):
     @blp.response(200, DraftSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Draft not found')
-    @require_token
+    @jwt_required()
     def get(self, draft_id):
         """Get draft by ID."""
-        draft = WeighInDraft.query.get(draft_id)
+        draft = db.session.get(WeighInDraft, draft_id)
         if not draft:
             return {
                 'error': {
@@ -153,13 +163,13 @@ class DraftDetail(MethodView):
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Draft not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Draft not in DRAFT status')
-    @require_token
+    @jwt_required()
     def patch(self, update_data, draft_id):
         """Update a draft.
         
         Only drafts in DRAFT status can be updated.
         """
-        draft = WeighInDraft.query.get(draft_id)
+        draft = db.session.get(WeighInDraft, draft_id)
         if not draft:
             return {
                 'error': {

@@ -1,9 +1,10 @@
 """Batches API endpoints."""
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_jwt_extended import jwt_required
 
 from ..extensions import db
-from ..auth import require_token
+from ..auth import require_roles
 from ..models import Batch, Article
 from ..services.validation import validate_batch_code
 from ..schemas.batches import BatchSchema, BatchCreateSchema, BatchListSchema
@@ -25,7 +26,7 @@ class ArticleBatchList(MethodView):
     @blp.response(200, BatchListSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
-    @require_token
+    @jwt_required()
     def get(self, article_no):
         """List batches for an article.
         
@@ -61,14 +62,16 @@ class BatchList(MethodView):
     @blp.response(201, BatchSchema)
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Batch already exists')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, batch_data):
         """Create a new batch.
         
-        Creates a batch for the specified article.
-        Batch code must be 4 digits (Mankiewicz) or 9-10 digits (Akzo).
+        Requires ADMIN role.
+        Batch code must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).
         """
         # Validate batch code format using service
         batch_code = batch_data['batch_code']
@@ -76,13 +79,13 @@ class BatchList(MethodView):
             return {
                 'error': {
                     'code': 'INVALID_BATCH_FORMAT',
-                    'message': f'Invalid batch code format: {batch_code}. Must be 4 digits (Mankiewicz) or 9-10 digits (Akzo)',
+                    'message': f'Invalid batch code format: {batch_code}. Must be 4-5 or 9-12 digits',
                     'details': {'batch_code': batch_code}
                 }
             }, 400
         
         # Check article exists
-        article = Article.query.get(batch_data['article_id'])
+        article = db.session.get(Article, batch_data['article_id'])
         if not article:
             return {
                 'error': {

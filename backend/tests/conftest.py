@@ -1,5 +1,6 @@
 """Shared pytest fixtures for all tests."""
 import os
+from datetime import timedelta
 import pytest
 
 from app import create_app
@@ -15,13 +16,21 @@ class TestConfig:
         'postgresql+psycopg2://localhost:5432/warehouse_test'
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    API_TOKEN = 'test-token'
     ENV = 'testing'
-    ALLOW_NO_AUTH_IN_DEV = True
+    
+    # JWT Configuration
+    JWT_SECRET_KEY = 'test-jwt-secret-key-for-testing'
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=15)
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=1)
+    JWT_TOKEN_LOCATION = ['headers']
+    JWT_HEADER_NAME = 'Authorization'
+    JWT_HEADER_TYPE = 'Bearer'
+    
     # Required for flask-smorest
     API_TITLE = 'Warehouse API Test'
     API_VERSION = '0.1.0'
     OPENAPI_VERSION = '3.0.3'
+    
     # CORS
     CORS_ORIGINS = 'http://localhost:3000'
     CORS_ALLOW_ALL = False
@@ -29,6 +38,11 @@ class TestConfig:
     @classmethod
     def get_cors_origins(cls):
         return [cls.CORS_ORIGINS]
+    
+    @classmethod
+    def validate_production_config(cls):
+        """No-op for testing."""
+        pass
 
 
 @pytest.fixture
@@ -61,9 +75,9 @@ def location(app):
 
 @pytest.fixture
 def user(app):
-    """Create test admin user."""
+    """Create test user (username: testuser, role: ADMIN)."""
     with app.app_context():
-        u = User(username='testadmin', role='ADMIN', is_active=True)
+        u = User(username='testuser', role='ADMIN', is_active=True)
         db.session.add(u)
         db.session.commit()
         user_id = u.id
@@ -140,6 +154,27 @@ def draft(app, location, article, batch, user):
             client_event_id='test-event-001',
             created_by_user_id=user,
             source='manual'
+        )
+        db.session.add(d)
+        db.session.commit()
+        draft_id = d.id
+    return draft_id
+
+
+@pytest.fixture
+def pending_draft(app, location, article, batch, user):
+    """Create pending draft for 5kg (for approval tests)."""
+    from decimal import Decimal
+    with app.app_context():
+        d = WeighInDraft(
+            location_id=location,
+            article_id=article,
+            batch_id=batch,
+            quantity_kg=Decimal('5.00'),
+            client_event_id='test-pending-draft-001',
+            created_by_user_id=user,
+            source='manual',
+            status='DRAFT'
         )
         db.session.add(d)
         db.session.commit()

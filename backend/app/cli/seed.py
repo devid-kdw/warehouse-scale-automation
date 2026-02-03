@@ -11,7 +11,13 @@ from ..models import User, Location, Article, Batch, Stock, Surplus
 @click.option('--demo', is_flag=True, help='Include demo articles, batches, and inventory')
 @with_appcontext
 def seed_command(demo):
-    """Seed initial data: location "13" and users.
+    """Seed initial data: location "13" and users with passwords.
+    
+    Default credentials:
+      - stefan (ADMIN): ChangeMe123!
+      - operator (OPERATOR): Operator123!
+    
+    CHANGE THESE PASSWORDS IMMEDIATELY after first login!
     
     Use --demo flag to also create sample articles, batches, and inventory.
     """
@@ -31,19 +37,31 @@ def seed_command(demo):
     admin = User.query.filter_by(username='stefan').first()
     if not admin:
         admin = User(username='stefan', role='ADMIN', is_active=True)
+        admin.set_password('ChangeMe123!')
         db.session.add(admin)
-        click.echo('  Created user: stefan (ADMIN)')
+        click.echo('  Created user: stefan (ADMIN) - password: ChangeMe123!')
     else:
-        click.echo('  User stefan already exists')
+        # Update password if user exists but has no password
+        if not admin.password_hash:
+            admin.set_password('ChangeMe123!')
+            click.echo('  Updated stefan with password: ChangeMe123!')
+        else:
+            click.echo('  User stefan already exists')
     
     # Create operator user if not exists
     operator = User.query.filter_by(username='operator').first()
     if not operator:
         operator = User(username='operator', role='OPERATOR', is_active=True)
+        operator.set_password('Operator123!')
         db.session.add(operator)
-        click.echo('  Created user: operator (OPERATOR)')
+        click.echo('  Created user: operator (OPERATOR) - password: Operator123!')
     else:
-        click.echo('  User operator already exists')
+        # Update password if user exists but has no password
+        if not operator.password_hash:
+            operator.set_password('Operator123!')
+            click.echo('  Updated operator with password: Operator123!')
+        else:
+            click.echo('  User operator already exists')
     
     # Demo data (optional)
     if demo:
@@ -145,6 +163,14 @@ def seed_command(demo):
             click.echo('  Created stock: 50.00kg for AKZO-BLUE-10L batch 292456953')
     
     db.session.commit()
+    
+    click.echo('')
+    click.echo('=' * 50)
+    click.echo('IMPORTANT: Change default passwords after first login!')
+    click.echo('  stefan: ChangeMe123!')
+    click.echo('  operator: Operator123!')
+    click.echo('=' * 50)
+    click.echo('')
     click.echo('Seed completed!')
 
 

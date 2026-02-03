@@ -1,5 +1,6 @@
 """Application configuration loaded from environment variables."""
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -24,17 +25,23 @@ class Config:
     ENV = os.getenv('ENV', 'development')
     DEBUG = ENV == 'development'
     
-    # Security
+    # JWT Authentication
+    JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-secret-change-in-production')
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.getenv('JWT_ACCESS_EXPIRES_MINUTES', 15)))
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(os.getenv('JWT_REFRESH_EXPIRES_DAYS', 30)))
+    JWT_TOKEN_LOCATION = ['headers']
+    JWT_HEADER_NAME = 'Authorization'
+    JWT_HEADER_TYPE = 'Bearer'
+    
+    # Legacy API Token (deprecated, for backward compatibility only)
     API_TOKEN = os.getenv('API_TOKEN', '')
     ALLOW_NO_AUTH_IN_DEV = os.getenv('ALLOW_NO_AUTH_IN_DEV', 'false').lower() == 'true'
     
     # CORS configuration
-    # Comma-separated list of allowed origins
     CORS_ORIGINS = os.getenv(
         'CORS_ORIGINS',
         'http://localhost:5173,http://localhost:3000'
     )
-    # Allow all origins (dev only - use with caution)
     CORS_ALLOW_ALL = os.getenv('CORS_ALLOW_ALL', 'false').lower() == 'true'
     
     # API documentation
@@ -46,14 +53,14 @@ class Config:
     OPENAPI_SWAGGER_UI_URL = 'https://cdn.jsdelivr.net/npm/swagger-ui-dist/'
     OPENAPI_JSON_PATH = '/openapi.json'
     
-    # OpenAPI security scheme
+    # OpenAPI security scheme - JWT Bearer
     API_SPEC_OPTIONS = {
         'components': {
             'securitySchemes': {
                 'bearerAuth': {
                     'type': 'http',
                     'scheme': 'bearer',
-                    'bearerFormat': 'API Token'
+                    'bearerFormat': 'JWT'
                 }
             }
         }
@@ -69,3 +76,13 @@ class Config:
         if cls.CORS_ALLOW_ALL:
             return '*'
         return [origin.strip() for origin in cls.CORS_ORIGINS.split(',') if origin.strip()]
+    
+    @classmethod
+    def validate_production_config(cls):
+        """Validate required config for production environment."""
+        if cls.ENV == 'production':
+            if cls.JWT_SECRET_KEY == 'dev-secret-change-in-production':
+                raise RuntimeError(
+                    "SECURITY ERROR: JWT_SECRET_KEY must be set in production. "
+                    "Set a strong random secret via environment variable."
+                )

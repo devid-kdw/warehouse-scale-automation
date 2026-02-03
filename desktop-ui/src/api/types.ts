@@ -69,7 +69,6 @@ export interface CreateDraftRequest {
 }
 
 export interface ApprovalRequest {
-    actor_user_id: number;
     note?: string;
 }
 

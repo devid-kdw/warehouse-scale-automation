@@ -5,10 +5,13 @@ import {
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconPlus, IconBox, IconAlertCircle } from '@tabler/icons-react';
+import { IconPlus, IconBox, IconAlertCircle, IconCheck, IconX } from '@tabler/icons-react';
 import { Article, Batch } from '../api/types';
 import { getArticles, getBatchesByArticle, createBatch, extractErrorMessage } from '../api/services';
+import { LoadingState } from '../components/common/LoadingState';
+import { EmptyState } from '../components/common/EmptyState';
 
 export default function Batches() {
     const queryClient = useQueryClient();
@@ -35,11 +38,25 @@ export default function Batches() {
 
     const createMutation = useMutation({
         mutationFn: createBatch,
-        onSuccess: () => {
+        onSuccess: (data) => {
+            notifications.show({
+                title: 'Success',
+                message: `Created batch ${data.batch_code} for article ${selectedArticleNo}`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+            });
             queryClient.invalidateQueries({ queryKey: ['batches', selectedArticleNo] });
             close();
             form.reset();
         },
+        onError: (err) => {
+            notifications.show({
+                title: 'Error',
+                message: extractErrorMessage(err),
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
+        }
     });
 
     const form = useForm({
@@ -48,8 +65,10 @@ export default function Batches() {
         },
         validate: {
             batch_code: (val) => {
-                if (!/^\d+$/.test(val)) return 'Digits only';
-                if (!((val.length >= 4 && val.length <= 5) || (val.length >= 9 && val.length <= 12))) {
+                const trimmed = val.trim();
+                if (!/^\d+$/.test(trimmed)) return 'Digits only';
+                const len = trimmed.length;
+                if (!((len >= 4 && len <= 5) || (len >= 9 && len <= 12))) {
                     return 'Must be 4-5 or 9-12 digits';
                 }
                 return null;
@@ -64,7 +83,7 @@ export default function Batches() {
 
         createMutation.mutate({
             article_id: article.id,
-            batch_code: values.batch_code
+            batch_code: values.batch_code.trim()
         });
     };
 
@@ -73,7 +92,7 @@ export default function Batches() {
             <Table.Td>{batch.id}</Table.Td>
             <Table.Td fw={700}>{batch.batch_code}</Table.Td>
             <Table.Td>
-                {batch.is_active ? <Badge color="green">Active</Badge> : <Badge color="gray">Inactive</Badge>}
+                {batch.is_active ? <Badge color="green" variant="dot">Active</Badge> : <Badge color="gray">Inactive</Badge>}
             </Table.Td>
             <Table.Td>{new Date(batch.created_at).toLocaleDateString()}</Table.Td>
         </Table.Tr>
@@ -104,19 +123,19 @@ export default function Batches() {
                 />
             </Paper>
 
-            <Paper shadow="xs" p="md" withBorder pos="relative">
-                <LoadingOverlay visible={batchesQuery.isLoading} />
+            <Paper shadow="xs" p="md" withBorder pos="relative" minH={200}>
+                <LoadingOverlay visible={batchesQuery.isLoading && !!selectedArticleNo} overlayProps={{ radius: "sm", blur: 2 }} />
 
                 {!selectedArticleNo ? (
-                    <Text c="dimmed" ta="center" py="xl">Please select an article.</Text>
+                    <EmptyState message="Please select an article to view batches" />
                 ) : batchesQuery.isError ? (
-                    <Alert color="red" title="Error">
+                    <Alert color="red" title="Error" icon={<IconAlertCircle size={16} />}>
                         {extractErrorMessage(batchesQuery.error)}
                     </Alert>
                 ) : batchesQuery.data?.items.length === 0 ? (
-                    <Text c="dimmed" ta="center" py="xl">No batches found for this article.</Text>
+                    <EmptyState message="No batches found for this article" />
                 ) : (
-                    <Table>
+                    <Table striped highlightOnHover>
                         <Table.Thead>
                             <Table.Tr>
                                 <Table.Th>ID</Table.Th>
@@ -130,15 +149,17 @@ export default function Batches() {
                 )}
             </Paper>
 
-            <Modal opened={opened} onClose={close} title={`New Batch for ${selectedArticleNo}`}>
+            <Modal opened={opened} onClose={close} title={`New Batch for ${selectedArticleNo}`} centered>
                 <form onSubmit={form.onSubmit(handleSubmit)}>
                     <Stack>
+                        <LoadingOverlay visible={createMutation.isPending} zIndex={1000} />
+
                         <TextInput
                             label="Batch Code"
                             placeholder="Numeric code"
                             description="4-5 digits (Mankiewicz) or 9-12 digits (Akzo)"
+                            withAsterisk
                             {...form.getInputProps('batch_code')}
-                            required
                         />
 
                         {createMutation.isError && (
@@ -149,7 +170,7 @@ export default function Batches() {
 
                         <Group justify="flex-end" mt="md">
                             <Button variant="default" onClick={close}>Cancel</Button>
-                            <Button type="submit" loading={createMutation.isPending} color="enikonBlue.5">Create Batch</Button>
+                            <Button type="submit" loading={createMutation.isPending}>Create Batch</Button>
                         </Group>
                     </Stack>
                 </form>

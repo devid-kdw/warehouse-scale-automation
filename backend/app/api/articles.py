@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 from flask import request
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_jwt_extended import jwt_required
 
 from ..extensions import db
-from ..auth import require_token
+from ..auth import require_roles
 from ..models import Article, Batch, Stock, Surplus, Transaction, WeighInDraft, User
 from ..schemas.articles import ArticleSchema, ArticleCreateSchema, ArticleListSchema
 from ..schemas.common import ErrorResponseSchema, SuccessMessageSchema
@@ -25,7 +26,7 @@ class ArticleList(MethodView):
     @blp.doc(security=[{'bearerAuth': []}])
     @blp.response(200, ArticleListSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
-    @require_token
+    @jwt_required()
     def get(self):
         """List articles.
         
@@ -53,8 +54,10 @@ class ArticleList(MethodView):
     @blp.response(201, ArticleSchema)
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Article already exists')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, article_data):
         """Create a new article.
         
@@ -86,7 +89,7 @@ class ArticleDetail(MethodView):
     @blp.response(200, ArticleSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
-    @require_token
+    @jwt_required()
     def get(self, article_no):
         """Get article by article_no."""
         article = Article.query.filter_by(article_no=article_no).first()
@@ -108,8 +111,10 @@ class ArticleArchive(MethodView):
     @blp.doc(security=[{'bearerAuth': []}])
     @blp.response(200, SuccessMessageSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, article_id):
         """Archive an article (soft delete).
         
@@ -142,8 +147,10 @@ class ArticleRestore(MethodView):
     @blp.doc(security=[{'bearerAuth': []}])
     @blp.response(200, SuccessMessageSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, article_id):
         """Restore an archived article.
         
@@ -176,9 +183,11 @@ class ArticleDelete(MethodView):
     @blp.doc(security=[{'bearerAuth': []}])
     @blp.response(200, SuccessMessageSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Article in use')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def delete(self, article_id):
         """Hard delete an article.
         

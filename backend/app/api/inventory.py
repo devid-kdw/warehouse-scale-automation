@@ -1,10 +1,11 @@
 """Inventory API endpoints."""
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import Schema, fields, validate
 
 from ..extensions import db
-from ..auth import require_token
+from ..auth import require_roles
 from ..services.inventory_service import adjust_inventory
 from ..error_handling import AppError
 from ..schemas.common import ErrorResponseSchema
@@ -18,7 +19,10 @@ blp = Blueprint(
 
 
 class InventoryAdjustSchema(Schema):
-    """Schema for inventory adjustment request."""
+    """Schema for inventory adjustment request.
+    
+    Note: actor_user_id removed - taken from JWT token.
+    """
     location_id = fields.Integer(required=True)
     article_id = fields.Integer(required=True)
     batch_id = fields.Integer(required=True)
@@ -36,7 +40,6 @@ class InventoryAdjustSchema(Schema):
         required=True,
         metadata={'description': 'Amount (must be >=0 for set, can be negative for delta)'}
     )
-    actor_user_id = fields.Integer(required=True)
     note = fields.String(
         allow_none=True,
         metadata={'description': 'Reason for adjustment'}
@@ -65,13 +68,16 @@ class InventoryAdjust(MethodView):
     @blp.response(200, InventoryAdjustResponseSchema)
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Entity not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Negative inventory not allowed')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, data):
         """Adjust inventory (stock or surplus).
         
-        Admin-only endpoint for manual inventory corrections.
+        ADMIN-only endpoint for manual inventory corrections.
+        Actor is determined from JWT token.
         
         Modes:
         - set: Set absolute value (must be >= 0)
@@ -80,6 +86,9 @@ class InventoryAdjust(MethodView):
         Creates an INVENTORY_ADJUSTMENT transaction for audit trail.
         """
         try:
+            # Get actor from JWT
+            actor_user_id = get_jwt_identity()
+            
             result = adjust_inventory(
                 location_id=data['location_id'],
                 article_id=data['article_id'],
@@ -87,7 +96,7 @@ class InventoryAdjust(MethodView):
                 target=data['target'],
                 mode=data['mode'],
                 quantity_kg=data['quantity_kg'],
-                actor_user_id=data['actor_user_id'],
+                actor_user_id=actor_user_id,
                 note=data.get('note')
             )
             db.session.commit()

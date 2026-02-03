@@ -11,15 +11,14 @@ class ApprovalActionSchema(Schema):
     old_value = fields.Dict(allow_none=True)
     new_value = fields.Dict(allow_none=True)
     note = fields.String(allow_none=True)
-    created_at = fields.DateTime(dump_only=True)
+    created_at = fields.String(dump_only=True)  # Already serialized as ISO string from to_dict()
 
 
 class ApprovalRequestSchema(Schema):
-    """Schema for approve/reject request."""
-    actor_user_id = fields.Integer(
-        required=True,
-        metadata={'description': 'User ID performing the action'}
-    )
+    """Schema for approve/reject request.
+    
+    Note: actor_user_id is no longer required - it's taken from JWT token.
+    """
     note = fields.String(
         allow_none=True,
         validate=validate.Length(max=500),
@@ -32,4 +31,6 @@ class ApprovalResponseSchema(Schema):
     message = fields.String(required=True)
     draft_id = fields.Integer(required=True)
     new_status = fields.String(required=True)
+    consumed_surplus_kg = fields.Float(allow_none=True)
+    consumed_stock_kg = fields.Float(allow_none=True)
     action = fields.Nested(ApprovalActionSchema)

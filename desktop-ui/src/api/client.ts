@@ -1,12 +1,12 @@
-import axios, { AxiosError } from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ApiErrorResponse } from './types';
-
-// Constants for LocalStorage keys
-export const STORAGE_KEYS = {
-    BASE_URL: 'app_base_url',
-    API_TOKEN: 'app_api_token',
-    ACTOR_ID: 'app_actor_id',
-};
+import {
+    getAccessToken,
+    getRefreshToken,
+    updateAccessToken,
+    logout,
+    getBaseUrl
+} from './auth';
 
 // Default configuration
 const DEFAULT_BASE_URL = 'http://localhost:5001';
@@ -19,28 +19,49 @@ export const apiClient = axios.create({
     },
 });
 
-// Request Interceptor: Inject Token and dynamic Base URL
-apiClient.interceptors.request.use((config) => {
-    const storedUrl = localStorage.getItem(STORAGE_KEYS.BASE_URL);
-    const token = localStorage.getItem(STORAGE_KEYS.API_TOKEN);
+// Flag to prevent multiple refresh attempts
+let isRefreshing = false;
+let failedQueue: Array<{
+    resolve: (token: string) => void;
+    reject: (error: Error) => void;
+}> = [];
 
-    // Update Base URL if stored, but respect proxy in DEV
-    if (storedUrl && config.baseURL !== storedUrl) {
-        // In DEV, if the user has localhost:5001 or 127.0.0.1:5001 configured, 
-        // ignore it and use relative path to hit the proxy
+const processQueue = (error: Error | null, token: string | null = null) => {
+    failedQueue.forEach(prom => {
+        if (error) {
+            prom.reject(error);
+        } else if (token) {
+            prom.resolve(token);
+        }
+    });
+    failedQueue = [];
+};
+
+// Request interceptor: inject JWT token
+apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+    // Update base URL from storage
+    const storedUrl = getBaseUrl();
+    if (storedUrl) {
+        // In DEV, use proxy for localhost
         if (import.meta.env.DEV && (storedUrl.includes('localhost') || storedUrl.includes('127.0.0.1'))) {
             config.baseURL = '';
         } else {
             config.baseURL = storedUrl;
         }
-    } else if (import.meta.env.DEV && config.baseURL === DEFAULT_BASE_URL) {
-        config.baseURL = ''; // Default to relative in dev
+    } else if (import.meta.env.DEV) {
+        config.baseURL = '';
     }
 
-    // Inject Token (skip for public endpoints)
-    const isPublicEndpoint = config.url?.endsWith('/health');
+    // Skip auth for public endpoints
+    const isPublicEndpoint = config.url?.includes('/health') || config.url?.includes('/auth/login');
+
+    // Inject access token
+    const token = getAccessToken();
+    console.log('[API Client] Request to:', config.url, 'Token present:', !!token, 'isPublic:', isPublicEndpoint);
+
     if (token && !isPublicEndpoint) {
         config.headers.Authorization = `Bearer ${token}`;
+        console.log('[API Client] Added Authorization header');
     }
 
     return config;
@@ -48,16 +69,80 @@ apiClient.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
-// Response Interceptor: Standardize Errors
+// Response interceptor: handle 401, refresh token
 apiClient.interceptors.response.use(
     (response) => response,
-    (error: AxiosError<ApiErrorResponse>) => {
-        // If we have a standardized backend error, we can try to format it? 
-        // Or just pass it through. 
-        // For now, allow components to handle specific error codes.
+    async (error: AxiosError<ApiErrorResponse>) => {
+        const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
-        // Global 401 handling could go here, but UI might want to show a banner instead of redirecting silently.
-        // We will let the query wrapper handling this.
+        // If 401 and not already retrying
+        if (error.response?.status === 401 && !originalRequest._retry) {
+            // Don't retry login or refresh endpoints
+            if (originalRequest.url?.includes('/auth/login') || originalRequest.url?.includes('/auth/refresh')) {
+                return Promise.reject(error);
+            }
+
+            if (isRefreshing) {
+                // Queue this request until refresh completes
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({
+                        resolve: (token: string) => {
+                            originalRequest.headers.Authorization = `Bearer ${token}`;
+                            resolve(apiClient(originalRequest));
+                        },
+                        reject
+                    });
+                });
+            }
+
+            originalRequest._retry = true;
+            isRefreshing = true;
+
+            const refreshToken = getRefreshToken();
+            if (!refreshToken) {
+                // No refresh token, logout
+                logout();
+                window.location.hash = '#/login';
+                return Promise.reject(error);
+            }
+
+            try {
+                // Attempt to refresh
+                const response = await axios.post(
+                    `${getBaseUrl()}/api/auth/refresh`,
+                    {},
+                    { headers: { Authorization: `Bearer ${refreshToken}` } }
+                );
+
+                const newAccessToken = response.data.access_token;
+                updateAccessToken(newAccessToken);
+
+                // Process queued requests
+                processQueue(null, newAccessToken);
+
+                // Retry original request
+                originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+                return apiClient(originalRequest);
+
+            } catch (refreshError) {
+                // Refresh failed, logout
+                processQueue(refreshError as Error, null);
+                logout();
+                window.location.hash = '#/login';
+                return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
+            }
+        }
+
         return Promise.reject(error);
     }
 );
+
+// Legacy storage keys (removed, now using auth.ts)
+// Storage keys
+export const STORAGE_KEYS = {
+    BASE_URL: 'app_base_url',
+    API_TOKEN: 'app_api_token',
+    ACTOR_ID: 'app_actor_id',
+};

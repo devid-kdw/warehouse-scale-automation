@@ -1,4 +1,3 @@
-
 import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
 import { NavLink, Box, Stack, Text, ThemeIcon, Group } from '@mantine/core';
 import {
@@ -8,32 +7,41 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { checkHealth } from '../api/services';
 
-export function Sidebar() {
+interface SidebarProps {
+    isAdmin?: boolean;
+}
+
+export function Sidebar({ isAdmin = false }: SidebarProps) {
     const location = useLocation();
 
     // Polling health check for connectivity banner
     const { data: health, isError } = useQuery({
         queryKey: ['health'],
         queryFn: checkHealth,
-        refetchInterval: 10000, // Check every 10s
+        refetchInterval: 10000,
         retry: false
     });
 
     const isConnected = !isError && !!health;
 
-    const links = [
-        { icon: IconScale, label: 'Draft Entry', to: '/drafts/new' },
-        { icon: IconChecklist, label: 'Draft Approvals', to: '/drafts' },
-        { icon: IconPackage, label: 'Articles', to: '/articles' },
-        { icon: IconTags, label: 'Batches', to: '/batches' },
-        { icon: IconServer, label: 'Inventory', to: '/inventory' },
-        { icon: IconSettings, label: 'Settings', to: '/settings' },
+    // Define links with role requirements
+    const allLinks = [
+        { icon: IconScale, label: 'Draft Entry', to: '/drafts/new', roles: ['ADMIN', 'OPERATOR'] },
+        { icon: IconChecklist, label: 'Draft Approvals', to: '/drafts', roles: ['ADMIN'] },
+        { icon: IconPackage, label: 'Articles', to: '/articles', roles: ['ADMIN'] },
+        { icon: IconTags, label: 'Batches', to: '/batches', roles: ['ADMIN'] },
+        { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN'] },
+        { icon: IconSettings, label: 'Settings', to: '/settings', roles: ['ADMIN', 'OPERATOR'] },
     ];
+
+    // Filter links based on role
+    const links = allLinks.filter(link =>
+        isAdmin || link.roles.includes('OPERATOR')
+    );
 
     return (
         <Stack h="100%" gap={0} justify="space-between">
             <Box p="md" style={{ borderBottom: '1px solid var(--mantine-color-gray-3)' }}>
-
                 <Group mt="xs" gap="xs">
                     <ThemeIcon color={isConnected ? 'green' : 'red'} variant="light" size="sm">
                         {isConnected ? <IconPlugConnected size={12} /> : <IconPlugX size={12} />}
@@ -69,5 +77,3 @@ export function Sidebar() {
         </Stack>
     );
 }
-
-

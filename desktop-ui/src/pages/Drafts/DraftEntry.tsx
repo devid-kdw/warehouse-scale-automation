@@ -1,19 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Container, Paper, Title, Select, TextInput, NumberInput,
-    Button, Group, Stack, Alert, ActionIcon, Tooltip
+    Button, Group, Stack, Alert, ActionIcon, Tooltip, Text, Anchor
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
-import { useQuery, useMutation } from '@tanstack/react-query';
-import { IconRefresh, IconCheck, IconX } from '@tabler/icons-react';
+import { notifications } from '@mantine/notifications';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { IconRefresh, IconCheck, IconX, IconDatabase, IconArrowRight } from '@tabler/icons-react';
 import { v4 as uuidv4 } from 'uuid';
 import { getArticles, getBatchesByArticle, createDraft } from '../../api/services';
 import { extractErrorMessage } from '../../api/services';
 import { useNavigate } from 'react-router-dom';
+import { useAppSettings } from '../../hooks/useAppSettings';
+import { LoadingState } from '../../components/common/LoadingState';
 
 export default function DraftEntry() {
     const navigate = useNavigate();
-    const [successMsg, setSuccessMsg] = useState('');
+    const queryClient = useQueryClient();
+    const { settings } = useAppSettings();
 
     const form = useForm({
         initialValues: {
@@ -21,7 +25,7 @@ export default function DraftEntry() {
             article_id: '',
             batch_id: '',
             quantity_kg: 0,
-            client_event_id: uuidv4(),
+            client_event_id: '', // Will be set on mount
         },
         validate: {
             location_id: (val) => !val ? 'Location ID is required' : null,
@@ -32,14 +36,25 @@ export default function DraftEntry() {
         },
     });
 
+    // Initialize UUID on mount
+    useEffect(() => {
+        if (!form.values.client_event_id) {
+            form.setFieldValue('client_event_id', uuidv4());
+        }
+    }, []);
+
     // Regenerate UUID helper
     const regenerateUuid = () => form.setFieldValue('client_event_id', uuidv4());
 
     // Fetch Articles
     const articlesQuery = useQuery({
-        queryKey: ['articles'],
+        queryKey: ['articles', 'true'], // active only
         queryFn: () => getArticles('true'),
-        select: (data) => data.items.map(a => ({ value: a.id.toString(), label: `${a.article_no} - ${a.description}`, article_no: a.article_no })),
+        select: (data) => data.items.map(a => ({
+            value: a.id.toString(),
+            label: `${a.article_no} - ${a.description}`,
+            article_no: a.article_no
+        })),
     });
 
     // Fetch Batches (dependent on Article)
@@ -54,7 +69,6 @@ export default function DraftEntry() {
     // Create Draft Mutation
     const mutation = useMutation({
         mutationFn: (values: typeof form.values) => {
-            // Convert string IDs to numbers where needed by API
             return createDraft({
                 location_id: parseInt(values.location_id),
                 article_id: parseInt(values.article_id),
@@ -63,35 +77,38 @@ export default function DraftEntry() {
                 client_event_id: values.client_event_id
             });
         },
-        onSuccess: () => {
-            setSuccessMsg(`Draft created successfully! (Event: ${form.values.client_event_id.slice(0, 8)}...)`);
-            form.reset();
-            form.setFieldValue('client_event_id', uuidv4()); // Gen new ID for next
-            // Clear success after 5s
-            setTimeout(() => setSuccessMsg(''), 5000);
+        onSuccess: (data) => {
+            notifications.show({
+                title: 'Draft Created',
+                message: `Draft ID: ${data.id} created successfully.`,
+                color: 'green',
+                icon: <IconCheck size={16} />,
+                autoClose: 10000,
+            });
+
+            // "Create Another" workflow:
+            // Keep Location, Article, Batch. Reset Quantity and generate new UUID.
+            form.setFieldValue('quantity_kg', 0);
+            form.setFieldValue('client_event_id', uuidv4());
+
+            // Invalidate drafts list so dashboard is up later
+            queryClient.invalidateQueries({ queryKey: ['drafts'] });
         },
-        onError: () => {
-            setSuccessMsg('');
+        onError: (err) => {
+            notifications.show({
+                title: 'Creation Failed',
+                message: extractErrorMessage(err),
+                color: 'red',
+                icon: <IconX size={16} />,
+            });
         }
     });
 
     return (
         <Container size="sm" py="xl">
             <Paper shadow="xs" p="xl" withBorder>
-                <Title order={2} mb="lg">Manual Weigh-In Entry</Title>
-
-                {successMsg && (
-                    <Alert icon={<IconCheck size={16} />} title="Success" color="green" mb="md" withCloseButton onClose={() => setSuccessMsg('')}>
-                        {successMsg}
-                        <Button variant="subtle" size="xs" onClick={() => navigate('/drafts')}>View Dashboard</Button>
-                    </Alert>
-                )}
-
-                {mutation.isError && (
-                    <Alert icon={<IconX size={16} />} title="Error" color="red" mb="md">
-                        {extractErrorMessage(mutation.error)}
-                    </Alert>
-                )}
+                <Title order={2} mb="md">Manual Weigh-In Entry</Title>
+                <Text c="dimmed" mb="xl">Create a new weight draft. Entries will be pending approval.</Text>
 
                 <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
                     <Stack>
@@ -109,11 +126,11 @@ export default function DraftEntry() {
                             nothingFoundMessage="No articles found"
                             disabled={articlesQuery.isLoading}
                             {...form.getInputProps('article_id')}
-                            // Reset batch when article changes
                             onChange={(val) => {
                                 form.setFieldValue('article_id', val || '');
-                                form.setFieldValue('batch_id', '');
+                                form.setFieldValue('batch_id', ''); // Reset batch
                             }}
+                            required
                         />
 
                         <Select
@@ -123,6 +140,7 @@ export default function DraftEntry() {
                             searchable
                             disabled={!form.values.article_id || batchesQuery.isLoading}
                             {...form.getInputProps('batch_id')}
+                            required
                         />
 
                         <NumberInput
@@ -131,8 +149,9 @@ export default function DraftEntry() {
                             decimalScale={2}
                             fixedDecimalScale
                             min={0.01}
-                            step={0.1}
+                            step={0.01}
                             {...form.getInputProps('quantity_kg')}
+                            required
                         />
 
                         <Group align="flex-end" gap="xs">
@@ -149,9 +168,24 @@ export default function DraftEntry() {
                             </Tooltip>
                         </Group>
 
-                        <Button type="submit" loading={mutation.isPending} mt="md">
-                            Submit Draft
-                        </Button>
+                        {mutation.isError && (
+                            <Alert icon={<IconX size={16} />} title="Error" color="red">
+                                {extractErrorMessage(mutation.error)}
+                            </Alert>
+                        )}
+
+                        {/* Success/Navigation hint */}
+                        {mutation.isSuccess && (
+                            <Alert icon={<IconCheck size={16} />} title="Success" color="green" withCloseButton onClose={mutation.reset}>
+                                Draft created! You can fill the form again for another entry, or <Anchor onClick={() => navigate('/drafts')} fw={700}>Go to Approvals</Anchor>.
+                            </Alert>
+                        )}
+
+                        <Group mt="md" grow>
+                            <Button type="submit" loading={mutation.isPending}>
+                                Submit Entry
+                            </Button>
+                        </Group>
                     </Stack>
                 </form>
             </Paper>

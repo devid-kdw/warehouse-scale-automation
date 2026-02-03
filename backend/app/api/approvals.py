@@ -1,9 +1,10 @@
 """Approvals API endpoints."""
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from ..extensions import db
-from ..auth import require_token
+from ..auth import require_roles
 from ..services.approval_service import approve_draft, reject_draft
 from ..error_handling import AppError, InsufficientStockError
 from ..schemas.approvals import ApprovalRequestSchema, ApprovalResponseSchema
@@ -26,11 +27,15 @@ class ApproveDraft(MethodView):
     @blp.response(200, ApprovalResponseSchema)
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Draft or user not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Draft not in DRAFT status or insufficient stock')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, approval_data, draft_id):
         """Approve a draft with atomic inventory update.
+        
+        Requires ADMIN role. Actor is determined from JWT token.
         
         Applies surplus-first consumption logic:
         1. Uses available surplus first
@@ -40,9 +45,12 @@ class ApproveDraft(MethodView):
         Creates transaction records for audit trail.
         """
         try:
+            # Get actor from JWT instead of request body (JWT identity is string, convert to int)
+            actor_user_id = int(get_jwt_identity())
+            
             result = approve_draft(
                 draft_id=draft_id,
-                actor_user_id=approval_data['actor_user_id'],
+                actor_user_id=actor_user_id,
                 note=approval_data.get('note')
             )
             db.session.commit()
@@ -87,18 +95,24 @@ class RejectDraft(MethodView):
     @blp.response(200, ApprovalResponseSchema)
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Draft or user not found')
     @blp.alt_response(409, schema=ErrorResponseSchema, description='Draft not in DRAFT status')
-    @require_token
+    @jwt_required()
+    @require_roles('ADMIN')
     def post(self, approval_data, draft_id):
         """Reject a draft.
         
+        Requires ADMIN role. Actor is determined from JWT token.
         No inventory changes occur on rejection.
         """
         try:
+            # Get actor from JWT instead of request body (JWT identity is string, convert to int)
+            actor_user_id = int(get_jwt_identity())
+            
             result = reject_draft(
                 draft_id=draft_id,
-                actor_user_id=approval_data['actor_user_id'],
+                actor_user_id=actor_user_id,
                 note=approval_data.get('note')
             )
             db.session.commit()
@@ -107,7 +121,7 @@ class RejectDraft(MethodView):
                 'message': 'Draft rejected successfully',
                 'draft_id': result['draft_id'],
                 'new_status': result['new_status'],
-                'action': result['approval_action']
+                'action': result.get('approval_action')  # Already a dict
             }
             
         except AppError as e:

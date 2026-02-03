@@ -2,9 +2,9 @@
 from datetime import datetime, timezone
 from flask.views import MethodView
 from flask_smorest import Blueprint
+from flask_jwt_extended import jwt_required
 
 from ..extensions import db
-from ..auth import require_token
 from ..models import Stock, Surplus, Transaction, Location, Article, Batch
 from ..schemas.reports import (
     InventoryReportSchema, TransactionReportSchema, ReportQuerySchema
@@ -27,7 +27,7 @@ class InventoryReport(MethodView):
     @blp.arguments(ReportQuerySchema, location='query')
     @blp.response(200, InventoryReportSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
-    @require_token
+    @jwt_required()
     def get(self, query_args):
         """Get inventory report.
         
@@ -97,7 +97,7 @@ class TransactionReport(MethodView):
     @blp.arguments(ReportQuerySchema, location='query')
     @blp.response(200, TransactionReportSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
-    @require_token
+    @jwt_required()
     def get(self, query_args):
         """Get transaction report.
         
