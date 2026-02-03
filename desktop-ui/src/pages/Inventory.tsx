@@ -11,9 +11,10 @@ import {
     IconCheck,
     IconSearch, IconClipboardCheck, IconX,
 } from '@tabler/icons-react';
-import { getInventorySummary, performInventoryCount, extractErrorMessage } from '../api/services'; // Ensure getArticles is imported
+import { getInventorySummary, performInventoryCount, extractErrorMessage } from '../api/services';
 import { InventoryItem, InventoryCountPayload } from '../api/types';
 import { EmptyState } from '../components/common/EmptyState';
+import { getExpiryStatus } from '../utils/expiry';
 import dayjs from 'dayjs';
 
 // --- Count Modal Component ---
@@ -119,8 +120,7 @@ export default function Inventory() {
     };
 
     const rows = filteredItems.map((item) => {
-        const isExpired = item.expiry_date && dayjs(item.expiry_date).isBefore(dayjs());
-        const isExpiringSoon = item.expiry_date && dayjs(item.expiry_date).isBefore(dayjs().add(30, 'days')) && !isExpired;
+        const expiryStatus = getExpiryStatus(item.expiry_date);
 
         return (
             <Table.Tr key={`${item.location_id}-${item.article_id}-${item.batch_id}`}>
@@ -133,8 +133,8 @@ export default function Inventory() {
                 <Table.Td>
                     {item.expiry_date ? (
                         <Badge
-                            color={isExpired ? 'red' : (isExpiringSoon ? 'orange' : 'gray')}
-                            variant={isExpired ? 'filled' : 'light'}
+                            color={expiryStatus === 'expired' ? 'red' : (expiryStatus === 'soon' ? 'orange' : 'gray')}
+                            variant={expiryStatus === 'expired' ? 'filled' : 'light'}
                         >
                             {dayjs(item.expiry_date).format('DD.MM.YYYY')}
                         </Badge>

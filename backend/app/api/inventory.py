@@ -9,13 +9,16 @@ from ..auth import require_roles
 from ..models import Stock, Surplus, Article, Batch, Location
 from ..services.inventory_service import adjust_inventory
 from ..services import inventory_count_service
+from ..services.receiving_service import receive_stock
 from ..error_handling import AppError
 from ..schemas.common import ErrorResponseSchema
 from ..schemas.inventory import (
     InventorySummaryResponseSchema,
     InventorySummaryQuerySchema,
     InventoryCountRequestSchema,
-    InventoryCountResponseSchema
+    InventoryCountResponseSchema,
+    StockReceiveRequestSchema,
+    StockReceiveResponseSchema
 )
 
 blp = Blueprint(
@@ -297,3 +300,58 @@ class InventoryCount(MethodView):
                     'details': e.details
                 }
             }, e.status_code
+
+
+@blp.route('/receive')
+class InventoryReceive(MethodView):
+    """Stock receiving resource."""
+    
+    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.arguments(StockReceiveRequestSchema)
+    @blp.response(201, StockReceiveResponseSchema)
+    @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
+    @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
+    @blp.alt_response(404, schema=ErrorResponseSchema, description='Article/Location not found')
+    @blp.alt_response(409, schema=ErrorResponseSchema, description='Batch expiry mismatch')
+    @jwt_required()
+    @require_roles('ADMIN')
+    def post(self, data):
+        """Receive stock (ADMIN only).
+        
+        Creates or reuses batch, increases stock, creates STOCK_RECEIPT transaction.
+        
+        - If batch exists with different expiry_date: 409 BATCH_EXPIRY_MISMATCH
+        - If batch exists with NULL expiry: backfills expiry_date
+        - If batch doesn't exist: auto-creates with provided expiry_date
+        """
+        actor_user_id = get_jwt_identity()
+        
+        try:
+            result = receive_stock(
+                article_id=data['article_id'],
+                batch_code=data['batch_code'],
+                quantity_kg=data['quantity_kg'],
+                expiry_date=data['expiry_date'],
+                actor_user_id=actor_user_id,
+                location_id=data.get('location_id', 1),
+                received_date=data.get('received_date'),
+                note=data.get('note')
+            )
+            db.session.commit()
+            return result, 201
+        except AppError as e:
+            db.session.rollback()
+            status_code = getattr(e, 'http_status', None)
+            if not status_code:
+                status_code = 404 if 'NOT_FOUND' in e.code else (
+                    409 if 'MISMATCH' in e.code or 'NOT_ALLOWED' in e.code else 400
+                )
+            return {
+                'error': {
+                    'code': e.code,
+                    'message': e.message,
+                    'details': e.details
+                }
+            }, status_code
+

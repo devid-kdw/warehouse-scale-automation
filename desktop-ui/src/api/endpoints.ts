@@ -31,6 +31,7 @@ export const API_ENDPOINTS = {
         SUMMARY: '/api/inventory/summary',
         COUNT: '/api/inventory/count',
         ADJUST: '/api/inventory/adjust',
+        RECEIVE: '/api/inventory/receive',
     },
 
     TRANSACTIONS: {

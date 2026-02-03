@@ -8,6 +8,31 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-03 - Receiving Workflow Implementation
+**What**: Implemented stock receiving (INBOUND) workflow with `POST /api/inventory/receive` endpoint.
+
+**Why**: Enable admins to record incoming stock deliveries with proper batch handling and audit trail.
+
+**Changes**:
+- Added `TX_STOCK_RECEIPT` transaction type to `Transaction` model
+- Created `receiving_service.py` with atomic batch/stock handling
+- Added `StockReceiveRequestSchema` and `StockReceiveResponseSchema` with Decimal fields
+- Added `POST /api/inventory/receive` endpoint (ADMIN-only)
+- Created 11 tests in `test_receiving.py` covering success, validation, and audit scenarios
+
+**Key Features**:
+- Decimal math with `ROUND_HALF_UP` (no floating point errors)
+- Batch auto-creation if doesn't exist
+- Expiry date backfill (NULL → set) with conflict detection (409)
+- Lock order: Batch → Stock (prevents deadlocks)
+- Full audit trail via `STOCK_RECEIPT` transaction
+
+**How to Test**: `pytest tests/test_receiving.py -v` (11 tests pass)
+
+**Ref**: Backend Agent implementation
+
+---
+
 ### 2026-02-03 - Orchestration Infrastructure Setup
 **What**: Created documentation structure for change tracking, decision logging, and status reporting.
 
@@ -35,9 +60,9 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 - Transaction audit trail
 - Inventory summary view with expiry warnings
 - Article and batch management
+- **Stock receiving workflow** (inbound goods)
 
 ### Known Limitations
-- **No receiving/inbound workflow** - cannot add new stock arrivals
 - Transaction reports UI needs improvement
 - Single-location only (location_id=1, code="13")
 

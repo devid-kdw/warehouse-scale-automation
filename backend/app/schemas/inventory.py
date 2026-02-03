@@ -1,5 +1,10 @@
 """Inventory Marshmallow schemas."""
+from decimal import Decimal, ROUND_HALF_UP
 from marshmallow import Schema, fields, validate
+
+
+# Batch code regex: 4-5 digits (Mankiewicz) or 9-12 digits (Akzo)
+BATCH_CODE_PATTERN = r'^\d{4,5}$|^\d{9,12}$'
 
 
 class InventorySummaryItemSchema(Schema):
@@ -77,3 +82,67 @@ class InventoryCountResponseSchema(Schema):
     shortage_draft_id = fields.Integer(allow_none=True)
     # Transactions created
     transactions = fields.List(fields.Dict())
+
+
+class StockReceiveRequestSchema(Schema):
+    """Schema for stock receiving request."""
+    location_id = fields.Integer(
+        load_default=1,
+        metadata={'description': 'Location ID (defaults to 1, only 1 allowed in v1)'}
+    )
+    article_id = fields.Integer(
+        required=True,
+        metadata={'description': 'Article ID'}
+    )
+    batch_code = fields.String(
+        required=True,
+        validate=validate.Regexp(
+            BATCH_CODE_PATTERN,
+            error='Invalid batch code. Must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).'
+        ),
+        metadata={'description': 'Batch code: 4-5 or 9-12 digits'}
+    )
+    quantity_kg = fields.Decimal(
+        required=True,
+        as_string=True,
+        places=2,
+        rounding=ROUND_HALF_UP,
+        validate=validate.Range(min=Decimal('0.01')),
+        metadata={'description': 'Quantity in kg (must be > 0)'}
+    )
+    expiry_date = fields.Date(
+        required=True,
+        metadata={'description': 'Batch expiry date (required)'}
+    )
+    received_date = fields.Date(
+        load_default=None,
+        metadata={'description': 'Date received (defaults to today)'}
+    )
+    note = fields.String(
+        allow_none=True,
+        validate=validate.Length(max=500),
+        metadata={'description': 'Optional note'}
+    )
+
+
+class StockReceiveResponseSchema(Schema):
+    """Schema for stock receiving response."""
+    batch_id = fields.Integer(metadata={'description': 'Batch ID'})
+    batch_created = fields.Boolean(metadata={'description': 'True if batch was auto-created'})
+    previous_stock = fields.Decimal(
+        as_string=True,
+        places=2,
+        metadata={'description': 'Stock before receiving'}
+    )
+    new_stock = fields.Decimal(
+        as_string=True,
+        places=2,
+        metadata={'description': 'Stock after receiving'}
+    )
+    quantity_received = fields.Decimal(
+        as_string=True,
+        places=2,
+        metadata={'description': 'Quantity received'}
+    )
+    transaction = fields.Dict(metadata={'description': 'STOCK_RECEIPT transaction'})
+

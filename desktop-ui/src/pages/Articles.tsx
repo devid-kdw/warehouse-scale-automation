@@ -2,96 +2,20 @@ import { useState } from 'react';
 import {
     Container, Paper, Title, Table, Button, Group, Alert,
     Modal, TextInput, Checkbox, Badge, ActionIcon, Menu, Tabs, Stack, LoadingOverlay,
-    NumberInput, Select, Text, Box
+    NumberInput, Select
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconSearch, IconDotsVertical, IconPlus, IconArchive, IconRestore, IconTrash, IconCheck, IconX, IconAlertCircle, IconTag } from '@tabler/icons-react';
-import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle, getAliases, createAlias, deleteAlias } from '../api/services';
-import { Article, Alias } from '../api/types';
+import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle } from '../api/services';
+import { Article } from '../api/types';
 import { LoadingState } from '../components/common/LoadingState';
 import { EmptyState } from '../components/common/EmptyState';
+import { AliasesEditor } from './Articles/components/AliasesEditor';
 
-// --- Aliases Modal Component ---
-function AliasesModal({ article, opened, onClose }: { article: Article | null, opened: boolean, onClose: () => void }) {
-    const queryClient = useQueryClient();
-    const [newAlias, setNewAlias] = useState('');
-
-    const { data, isLoading } = useQuery({
-        queryKey: ['aliases', article?.id],
-        queryFn: () => getAliases(article!.id),
-        enabled: !!article,
-    });
-
-    const createMutation = useMutation({
-        mutationFn: (alias: string) => createAlias(article!.id, alias),
-        onSuccess: () => {
-            notifications.show({ title: 'Success', message: 'Alias added', color: 'green' });
-            setNewAlias('');
-            queryClient.invalidateQueries({ queryKey: ['aliases', article?.id] });
-        },
-        onError: (err) => notifications.show({ title: 'Error', message: extractErrorMessage(err), color: 'red' })
-    });
-
-    const deleteMutation = useMutation({
-        mutationFn: (aliasId: number) => deleteAlias(article!.id, aliasId),
-        onSuccess: () => {
-            notifications.show({ title: 'Success', message: 'Alias deleted', color: 'green' });
-            queryClient.invalidateQueries({ queryKey: ['aliases', article?.id] });
-        },
-        onError: (err) => notifications.show({ title: 'Error', message: extractErrorMessage(err), color: 'red' })
-    });
-
-    const handleAdd = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newAlias.trim()) return;
-        createMutation.mutate(newAlias.trim());
-    };
-
-    return (
-        <Modal opened={opened} onClose={onClose} title={`Aliases for ${article?.article_no}`} centered>
-            <Stack>
-                <form onSubmit={handleAdd}>
-                    <Group>
-                        <TextInput
-                            placeholder="New alias code..."
-                            value={newAlias}
-                            onChange={(e) => setNewAlias(e.currentTarget.value)}
-                            style={{ flex: 1 }}
-                            disabled={createMutation.isPending}
-                        />
-                        <Button type="submit" loading={createMutation.isPending}>Add</Button>
-                    </Group>
-                </form>
-
-                <Box mih={200} pos="relative">
-                    <LoadingOverlay visible={isLoading || deleteMutation.isPending} />
-                    {data?.items.length === 0 ? (
-                        <Text c="dimmed" ta="center" py="xl">No aliases found.</Text>
-                    ) : (
-                        <Table>
-                            <Table.Thead><Table.Tr><Table.Th>Alias</Table.Th><Table.Th w={50}></Table.Th></Table.Tr></Table.Thead>
-                            <Table.Tbody>
-                                {data?.items.map((a: Alias) => (
-                                    <Table.Tr key={a.id}>
-                                        <Table.Td>{a.alias}</Table.Td>
-                                        <Table.Td>
-                                            <ActionIcon color="red" variant="subtle" onClick={() => deleteMutation.mutate(a.id)}>
-                                                <IconTrash size={16} />
-                                            </ActionIcon>
-                                        </Table.Td>
-                                    </Table.Tr>
-                                ))}
-                            </Table.Tbody>
-                        </Table>
-                    )}
-                </Box>
-            </Stack>
-        </Modal>
-    );
-}
+// Internal AliasesModal removed in favor of imported component
 
 export default function Articles() {
     const queryClient = useQueryClient();
@@ -355,7 +279,7 @@ export default function Articles() {
                 </form>
             </Modal>
 
-            <AliasesModal
+            <AliasesEditor
                 article={selectedArticle}
                 opened={aliasesOpened}
                 onClose={() => { closeAliases(); setSelectedArticle(null); }}

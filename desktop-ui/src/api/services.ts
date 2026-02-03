@@ -3,7 +3,7 @@ import { API_ENDPOINTS } from './endpoints';
 import {
     Article, Batch,
     WeighInDraft, CreateDraftPayload, ApprovalPayload, ApprovalResponse,
-    CreateArticlePayload, CreateBatchPayload,
+    CreateArticlePayload, CreateBatchPayload, StockReceivePayload, StockReceiveResponse,
     InventoryResponse, InventoryCountPayload, TransactionsResponse, AliasesResponse
 } from './types';
 import { AxiosError } from 'axios';
@@ -90,6 +90,12 @@ export const performInventoryCount = async (data: InventoryCountPayload) => {
     const response = await apiClient.post(API_ENDPOINTS.INVENTORY.COUNT, data);
     return response.data;
 };
+
+export const receiveStock = async (data: StockReceivePayload) => {
+    const response = await apiClient.post<StockReceiveResponse>(API_ENDPOINTS.INVENTORY.RECEIVE, data);
+    return response.data;
+};
+
 
 // --- Transactions ---
 export const getTransactions = async (params?: any) => {

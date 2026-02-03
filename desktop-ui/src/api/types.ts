@@ -144,3 +144,22 @@ export interface InventoryCountPayload {
     note?: string;
     client_event_id?: string;
 }
+
+export interface StockReceivePayload {
+    location_id?: number; // Defaults to 1
+    article_id: number;
+    batch_code: string;
+    quantity_kg: number;
+    expiry_date: string; // YYYY-MM-DD
+    received_date?: string; // YYYY-MM-DD
+    note?: string;
+}
+
+export interface StockReceiveResponse {
+    batch_id: number;
+    batch_created: boolean;
+    previous_stock: string;
+    new_stock: string;
+    quantity_received: string;
+    transaction: any;
+}

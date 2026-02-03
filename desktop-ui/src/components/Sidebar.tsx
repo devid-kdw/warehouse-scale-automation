@@ -2,7 +2,7 @@ import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
 import { NavLink, Box, Stack, Text, ThemeIcon, Group } from '@mantine/core';
 import {
     IconSettings, IconScale, IconChecklist, IconPackage,
-    IconTags, IconServer, IconPlugConnected, IconPlugX, IconFileSpreadsheet
+    IconTags, IconServer, IconPlugConnected, IconPlugX, IconFileSpreadsheet, IconPackageImport
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { checkHealth } from '../api/services';
@@ -30,6 +30,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
         { icon: IconChecklist, label: 'Draft Approvals', to: '/drafts', roles: ['ADMIN'] },
         { icon: IconPackage, label: 'Articles', to: '/articles', roles: ['ADMIN'] },
         { icon: IconTags, label: 'Batches', to: '/batches', roles: ['ADMIN'] },
+        { icon: IconPackageImport, label: 'Receiving', to: '/receiving', roles: ['ADMIN'] },
         { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN'] },
         { icon: IconFileSpreadsheet, label: 'Reports', to: '/reports', roles: ['ADMIN'] },
         { icon: IconSettings, label: 'Settings', to: '/settings', roles: ['ADMIN', 'OPERATOR'] },

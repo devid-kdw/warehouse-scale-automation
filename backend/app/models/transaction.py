@@ -8,7 +8,7 @@ class Transaction(db.Model):
     """Transaction audit log.
     
     Records all inventory changes for audit trail.
-    tx_type: WEIGH_IN, SURPLUS_CONSUMED, STOCK_CONSUMED, INVENTORY_ADJUSTMENT
+    tx_type: WEIGH_IN, SURPLUS_CONSUMED, STOCK_CONSUMED, INVENTORY_ADJUSTMENT, STOCK_RECEIPT
     """
     
     __tablename__ = 'transactions'
@@ -67,7 +67,8 @@ class Transaction(db.Model):
     TX_SURPLUS_CONSUMED = 'SURPLUS_CONSUMED'
     TX_STOCK_CONSUMED = 'STOCK_CONSUMED'
     TX_INVENTORY_ADJUSTMENT = 'INVENTORY_ADJUSTMENT'
-    VALID_TX_TYPES = [TX_WEIGH_IN, TX_SURPLUS_CONSUMED, TX_STOCK_CONSUMED, TX_INVENTORY_ADJUSTMENT]
+    TX_STOCK_RECEIPT = 'STOCK_RECEIPT'
+    VALID_TX_TYPES = [TX_WEIGH_IN, TX_SURPLUS_CONSUMED, TX_STOCK_CONSUMED, TX_INVENTORY_ADJUSTMENT, TX_STOCK_RECEIPT]
     
     def __repr__(self):
         return f'<Transaction {self.tx_type} {self.quantity_kg}kg>'

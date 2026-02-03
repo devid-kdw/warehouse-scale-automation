@@ -5,10 +5,10 @@ from ..extensions import db
 
 
 class Batch(db.Model):
-    """Batch model - unique per article.
+    r"""Batch model - unique per article.
     
-    Batch code validation: 4 digits (Mankiewicz) or 9-10 digits (Akzo)
-    Regex: ^\d{4}$|^\d{9,10}$
+    Batch code validation: 4-5 digits (Mankiewicz) or 9-12 digits (Akzo)
+    Regex: ^\d{4,5}$|^\d{9,12}$
     """
     
     __tablename__ = 'batches'
