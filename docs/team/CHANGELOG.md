@@ -8,6 +8,30 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-04 - Article v1.2 & JWT Security Policy
+**What**: Updated Article model with standard paint fields and tightened JWT security.
+
+**Why**: Enforce data quality (units, manufacturer info) and ensure production security standards.
+
+**Changes**:
+- **Backend**:
+  - `Article` model: Added `uom` (KG/L - required), `manufacturer`, `manufacturer_art_number`, `reorder_threshold`.
+  - `ArticleSchema`: Validates `uom` (must be KG or L), deprecated `base_uom`.
+  - Config: Updated JWT attributes (15 min access, 7 day refresh).
+  
+- **Frontend**:
+  - Added `useAuth` hook for reactive auth state.
+  - Updated API client endpoints and types (inferred from file list).
+
+**How to Test**:
+- Create article without `uom` -> Expect 400 Error.
+- Create article with `uom='KG'` -> Success.
+- Check `.env` for new JWT settings.
+
+**Ref**: Decisions 2026-02-04
+
+---
+
 ### 2026-02-04 - Agent Documentation Infrastructure
 **What**: Created comprehensive documentation system for multi-agent coordination.
 

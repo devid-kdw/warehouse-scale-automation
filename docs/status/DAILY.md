@@ -13,6 +13,10 @@ This is a running log of daily progress. Keep entries brief (3-5 sentences max).
   - `AGENT_INSTRUCTIONS.md` - upute za Frontend/Backend/Testing agente
   - `QUICK_AGENT_BRIEFINGS.md` - copy-paste briefinzi
   - `DEVELOPMENT_SETUP.md` - setup guide s troubleshooting
+- ✅ **Backend Feature Updates**:
+  - Article v1.2 fields implemented (`uom`, `manufacturer`)
+  - JWT Config updated (security policy)
+  - Frontend `useAuth` hook created
 - Updatean `README.md` s linkovima na svu dokumentaciju
 - Točne upute za testiranje aplikacije (Electron + Browser: http://localhost:5173)
 
