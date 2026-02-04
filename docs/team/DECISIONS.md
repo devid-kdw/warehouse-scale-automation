@@ -134,6 +134,53 @@ Format: **Date** | **Decision** | **Rationale** | **Implications**
 
 ---
 
+---
+
+### 2026-02-04 - Inventory Count Business Rules (LOCKED)
+**Decision**: Standardized rules for inventory count discrepancies.
+
+**Rules**:
+1. **Overage (surplus)**: If counted > total, add difference to `surplus`. Stock remains unchanged.
+2. **Match**: No change.
+3. **Shortage (deficit)**: If counted < total:
+   - Surplus reset to 0
+   - Create `WeighInDraft` (type=INVENTORY_SHORTAGE) for the deficit amount
+   - Admin must approve draft to reduce `stock`
+4. **Stock Integrity**: Stock quantity never drops below 0 automatically.
+5. **Consumption Priority**: Surplus is always consumed before stock in approval workflows.
+
+**Rationale**: Prevents accidental stock destruction, ensures audit trail for losses (draft approval), and prioritizes consuming "found" material (surplus) first.
+
+---
+
+### 2026-02-04 - Receiving Workflow Lockdown
+**Decision**: New stock can ONLY be added via the Receiving Workflow (`POST /api/inventory/receive`) or Initial Inventory Count.
+**Constraint**: "Draft Approve" workflow is STRICTLY for consumption/weigh-in. It never increases stock.
+
+**Rationale**: separation of concerns. Receiving is an admin/warehouse manager function with strict batch/expiry controls. Weighing is an operator function for consumption.
+
+---
+
+### 2026-02-04 - Article Core Fields & UOM
+**Decision**: 
+- `uom` (KG/L) is REQUIRED and authoritative.
+- `base_uom` is DEPRECATED (kept for legacy compatibility only).
+- **Core Fields**: `article_no`, `description`, `uom`, `manufacturer`, `manufacturer_art_number`, `is_active`.
+
+**Rationale**: Enforces data quality. Prevents "unknown unit" errors in UI.
+
+---
+
+### 2026-02-04 - JWT Security Policy
+**Decision**:
+- Access Token: 15 minutes
+- Refresh Token: 7 days
+- Production: Server MUST fail to start if `JWT_SECRET_KEY` is default or too short (<32 chars).
+
+**Rationale**: Balance between security (short access token) and usability (weekly login). Hard failure in production prevents accidental insecure deployments.
+
+---
+
 ## Deprecated/Superseded Decisions
 
 _(None yet)_

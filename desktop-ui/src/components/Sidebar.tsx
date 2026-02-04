@@ -26,13 +26,18 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
 
     // Define links with role requirements
     const allLinks = [
+        // OPERATOR & ADMIN
         { icon: IconScale, label: 'Draft Entry', to: '/drafts/new', roles: ['ADMIN', 'OPERATOR'] },
-        { icon: IconChecklist, label: 'Draft Approvals', to: '/drafts', roles: ['ADMIN'] },
+
+        // ADMIN ONLY
+        { icon: IconPackageImport, label: 'Receive Stock', to: '/receiving', roles: ['ADMIN'] },
+        { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN'] },
+        { icon: IconChecklist, label: 'Approvals', to: '/drafts', roles: ['ADMIN'] },
         { icon: IconPackage, label: 'Articles', to: '/articles', roles: ['ADMIN'] },
         { icon: IconTags, label: 'Batches', to: '/batches', roles: ['ADMIN'] },
-        { icon: IconPackageImport, label: 'Receiving', to: '/receiving', roles: ['ADMIN'] },
-        { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN'] },
         { icon: IconFileSpreadsheet, label: 'Reports', to: '/reports', roles: ['ADMIN'] },
+
+        // SHARED
         { icon: IconSettings, label: 'Settings', to: '/settings', roles: ['ADMIN', 'OPERATOR'] },
     ];
 

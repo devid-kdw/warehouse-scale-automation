@@ -28,7 +28,7 @@ class Config:
     # JWT Authentication
     JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'dev-secret-change-in-production')
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=int(os.getenv('JWT_ACCESS_EXPIRES_MINUTES', 15)))
-    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(os.getenv('JWT_REFRESH_EXPIRES_DAYS', 30)))
+    JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=int(os.getenv('JWT_REFRESH_EXPIRES_DAYS', 7)))  # 7 days per spec
     JWT_TOKEN_LOCATION = ['headers']
     JWT_HEADER_NAME = 'Authorization'
     JWT_HEADER_TYPE = 'Bearer'
@@ -70,6 +70,9 @@ class Config:
     QUANTITY_MIN = 0.01
     QUANTITY_MAX = 9999.99
     
+    # JWT Security settings
+    JWT_MIN_SECRET_LENGTH = 32
+    
     @classmethod
     def get_cors_origins(cls):
         """Parse CORS_ORIGINS into a list."""
@@ -81,8 +84,16 @@ class Config:
     def validate_production_config(cls):
         """Validate required config for production environment."""
         if cls.ENV == 'production':
+            # Check for default/weak JWT secret
             if cls.JWT_SECRET_KEY == 'dev-secret-change-in-production':
                 raise RuntimeError(
                     "SECURITY ERROR: JWT_SECRET_KEY must be set in production. "
                     "Set a strong random secret via environment variable."
                 )
+            # Check minimum secret length
+            if len(cls.JWT_SECRET_KEY) < cls.JWT_MIN_SECRET_LENGTH:
+                raise RuntimeError(
+                    f"SECURITY ERROR: JWT_SECRET_KEY must be at least {cls.JWT_MIN_SECRET_LENGTH} characters. "
+                    f"Current length: {len(cls.JWT_SECRET_KEY)}"
+                )
+

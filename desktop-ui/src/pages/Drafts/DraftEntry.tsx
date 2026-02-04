@@ -13,11 +13,22 @@ import { getArticles, getBatchesByArticle, createDraft } from '../../api/service
 import { extractErrorMessage } from '../../api/services';
 import { useNavigate } from 'react-router-dom';
 import { useAppSettings } from '../../hooks/useAppSettings';
+import { useAuth } from '../../hooks/useAuth';
+import { getDrafts } from '../../api/services';
+import { Table, Badge } from '@mantine/core';
 
 export default function DraftEntry() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     useAppSettings();
+    const { user } = useAuth();
+
+    // Fetch My Drafts
+    const draftsQuery = useQuery({
+        queryKey: ['drafts', 'my'],
+        queryFn: () => getDrafts(), // Fetch all, filtered client side
+        select: (data) => data.items.filter(d => d.created_by_user_id === user?.id).sort((a, b) => b.id - a.id).slice(0, 5) // Last 5
+    });
 
     const form = useForm({
         initialValues: {
@@ -204,6 +215,43 @@ export default function DraftEntry() {
                     </Stack>
                 </form>
             </Paper>
-        </Container>
+
+
+            <Paper shadow="xs" p="xl" mt="xl" withBorder>
+                <Title order={3} mb="md">My Recent Drafts</Title>
+                {draftsQuery.isLoading ? (
+                    <Text size="sm">Loading drafts...</Text>
+                ) : draftsQuery.data && draftsQuery.data.length > 0 ? (
+                    <Table>
+                        <Table.Thead>
+                            <Table.Tr>
+                                <Table.Th>ID</Table.Th>
+                                <Table.Th>Article</Table.Th>
+                                <Table.Th>Batch</Table.Th>
+                                <Table.Th>Qty</Table.Th>
+                                <Table.Th>Status</Table.Th>
+                            </Table.Tr>
+                        </Table.Thead>
+                        <Table.Tbody>
+                            {draftsQuery.data.map(draft => (
+                                <Table.Tr key={draft.id}>
+                                    <Table.Td>{draft.id}</Table.Td>
+                                    <Table.Td>{draft.article_id}</Table.Td>
+                                    <Table.Td>{draft.batch_id}</Table.Td>
+                                    <Table.Td>{draft.quantity_kg}</Table.Td>
+                                    <Table.Td>
+                                        <Badge color={draft.status === 'APPROVED' ? 'green' : (draft.status === 'REJECTED' ? 'red' : 'blue')}>
+                                            {draft.status}
+                                        </Badge>
+                                    </Table.Td>
+                                </Table.Tr>
+                            ))}
+                        </Table.Tbody>
+                    </Table>
+                ) : (
+                    <Text c="dimmed" size="sm">No recent drafts found.</Text>
+                )}
+            </Paper>
+        </Container >
     );
 }

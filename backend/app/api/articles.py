@@ -37,19 +37,49 @@ class ArticleList(MethodView):
         - active=true (default): only active articles
         - active=false: only archived articles
         - active=all: all articles
+        
+        Returns last_consumed_at for each article (based on STOCK_CONSUMED/SURPLUS_CONSUMED).
         """
         active = request.args.get('active', 'true')
         
+        # Subquery: get MAX(occurred_at) per article for consumption transactions only
+        consumption_types = [Transaction.TX_STOCK_CONSUMED, Transaction.TX_SURPLUS_CONSUMED]
+        last_consumed_subq = db.session.query(
+            Transaction.article_id,
+            db.func.max(Transaction.occurred_at).label('last_consumed_at')
+        ).filter(
+            Transaction.tx_type.in_(consumption_types)
+        ).group_by(Transaction.article_id).subquery()
+        
+        # Build query with outer join
+        query = db.session.query(
+            Article,
+            last_consumed_subq.c.last_consumed_at
+        ).outerjoin(
+            last_consumed_subq,
+            Article.id == last_consumed_subq.c.article_id
+        )
+        
+        # Apply active filter
         if active == 'all':
-            articles = Article.query.all()
+            pass  # No filter
         elif active == 'false':
-            articles = Article.query.filter_by(is_active=False).all()
+            query = query.filter(Article.is_active == False)
         else:
-            articles = Article.query.filter_by(is_active=True).all()
+            query = query.filter(Article.is_active == True)
+        
+        results = query.all()
+        
+        # Build response with last_consumed_at attached
+        items = []
+        for article, last_consumed_at in results:
+            # Attach computed field to article object for schema serialization
+            article.last_consumed_at = last_consumed_at
+            items.append(article)
         
         return {
-            'items': articles,
-            'total': len(articles)
+            'items': items,
+            'total': len(items)
         }
     
     @blp.doc(security=[{'bearerAuth': []}])

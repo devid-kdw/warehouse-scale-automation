@@ -18,7 +18,7 @@ class Article(db.Model):
     pack_uom = db.Column(db.Text, nullable=True)
     barcode = db.Column(db.Text, nullable=True)
     # New columns for v1.2
-    uom = db.Column(db.String(10), nullable=True)  # KG, L
+    uom = db.Column(db.String(10), nullable=False)  # KG or L - REQUIRED, no default
     manufacturer = db.Column(db.Text, nullable=True)
     manufacturer_art_number = db.Column(db.Text, nullable=True)  # Vendor code e.g., 34665.91B6.7.171
     reorder_threshold = db.Column(db.Numeric(14, 2), nullable=True)  # Future low stock alarm

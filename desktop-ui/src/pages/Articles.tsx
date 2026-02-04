@@ -9,8 +9,9 @@ import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconSearch, IconDotsVertical, IconPlus, IconArchive, IconRestore, IconTrash, IconCheck, IconX, IconAlertCircle, IconTag } from '@tabler/icons-react';
-import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle } from '../api/services';
+import { getArticles, createArticle, archiveArticle, restoreArticle, extractErrorMessage, deleteArticle, resolveArticle } from '../api/services';
 import { Article } from '../api/types';
+import { useDebouncedValue } from '@mantine/hooks';
 import { LoadingState } from '../components/common/LoadingState';
 import { EmptyState } from '../components/common/EmptyState';
 import { AliasesEditor } from './Articles/components/AliasesEditor';
@@ -23,6 +24,8 @@ export default function Articles() {
     const [aliasesOpened, { open: openAliases, close: closeAliases }] = useDisclosure(false);
     const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
     const [filter, setFilter] = useState('');
+    const [debouncedFilter] = useDebouncedValue(filter, 300);
+    const [resolvedMatch, setResolvedMatch] = useState<Article | null>(null);
     const [activeTab, setActiveTab] = useState<string | null>('active');
 
     // Fetch Articles based on tab
@@ -31,6 +34,23 @@ export default function Articles() {
         queryKey: ['articles', apiFilter],
         queryFn: () => getArticles(apiFilter as any),
     });
+
+    // Resolve Article by Alias/No
+    const resolveQuery = useQuery({
+        queryKey: ['resolve', debouncedFilter],
+        queryFn: () => resolveArticle(debouncedFilter),
+        enabled: debouncedFilter.length > 2,
+        retry: false
+    });
+
+    // Sync resolved match
+    if (resolveQuery.data && resolveQuery.data.id !== resolvedMatch?.id) {
+        setResolvedMatch(resolveQuery.data);
+    } else if (resolveQuery.isError && resolvedMatch) {
+        setResolvedMatch(null);
+    } else if (!debouncedFilter && resolvedMatch) {
+        setResolvedMatch(null);
+    }
 
     const form = useForm({
         initialValues: {
@@ -109,15 +129,30 @@ export default function Articles() {
         openAliases();
     };
 
-    const filteredItems = data?.items.filter((item: Article) =>
-        item.article_no.toLowerCase().includes(filter.toLowerCase()) ||
-        (item.description || '').toLowerCase().includes(filter.toLowerCase())
-    ) || [];
+    const filteredItems = (data?.items || []).filter((item: Article) => {
+        const matchesText = item.article_no.toLowerCase().includes(filter.toLowerCase()) ||
+            (item.description || '').toLowerCase().includes(filter.toLowerCase()) ||
+            (item.manufacturer_art_number || '').toLowerCase().includes(filter.toLowerCase());
+
+        if (matchesText) return true;
+
+        // If resolved match exists and equals this item, include it
+        if (resolvedMatch && item.id === resolvedMatch.id) return true;
+
+        return false;
+    });
 
     const rows = filteredItems.map((article: Article) => (
         <Table.Tr key={article.id} style={{ opacity: article.is_active ? 1 : 0.6 }}>
-            <Table.Td>{article.article_no}</Table.Td>
+            <Table.Td>
+                {article.article_no}
+                {resolvedMatch?.id === article.id && !article.article_no.toLowerCase().includes(filter.toLowerCase()) && (
+                    <Badge size="xs" color="violet" ml="xs">Matched via alias</Badge>
+                )}
+            </Table.Td>
             <Table.Td>{article.description}</Table.Td>
+            <Table.Td>{article.manufacturer || '-'}</Table.Td>
+            <Table.Td>{article.manufacturer_art_number || '-'}</Table.Td>
             <Table.Td>{article.uom || '-'}</Table.Td>
             <Table.Td>
                 {article.is_paint ? <Badge color="blue" variant="light">Paint</Badge> : <Badge color="gray" variant="light">Consumable</Badge>}
@@ -198,6 +233,8 @@ export default function Articles() {
                             <Table.Tr>
                                 <Table.Th>Article No.</Table.Th>
                                 <Table.Th>Description</Table.Th>
+                                <Table.Th>Manufacturer</Table.Th>
+                                <Table.Th>Ref No.</Table.Th>
                                 <Table.Th>UOM</Table.Th>
                                 <Table.Th>Type</Table.Th>
                                 <Table.Th>Status</Table.Th>

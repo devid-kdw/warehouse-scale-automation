@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell, Group, Text, Button, Menu } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { IconLogout, IconUser } from '@tabler/icons-react';
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
@@ -15,8 +16,6 @@ import Reports from './pages/Reports';
 import Receiving from './pages/Receiving';
 import logo from './assets/enikon-logo.jpg';
 import {
-    getAuthState,
-    subscribe,
     logout,
     AuthState
 } from './api/auth';
@@ -30,18 +29,7 @@ const queryClient = new QueryClient({
     }
 });
 
-// Hook to use auth state reactively
-function useAuth() {
-    const [authState, setAuthState] = useState<AuthState>(getAuthState());
-
-    useEffect(() => {
-        return subscribe(setAuthState);
-    }, []);
-
-    return authState;
-}
-
-// Protected route wrapper
+import { useAuth } from './hooks/useAuth';
 function RequireAuth({ children }: { children: React.ReactNode }) {
     const auth = useAuth();
     const location = useLocation();
@@ -62,6 +50,11 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
     }
 
     if (auth.user?.role !== 'ADMIN') {
+        notifications.show({
+            title: 'Access Denied',
+            message: 'You do not have permission to view this page.',
+            color: 'red',
+        });
         return <Navigate to="/drafts/new" replace />;
     }
 

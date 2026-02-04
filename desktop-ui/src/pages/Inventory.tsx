@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
     Container, Title, Paper, Table, Group, Button, TextInput,
-    Badge, LoadingOverlay, Modal, NumberInput, Stack, Text
+    Badge, LoadingOverlay, Modal, NumberInput, Stack, Text,
+    Menu, ActionIcon, Tooltip
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
@@ -9,13 +10,16 @@ import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     IconCheck,
-    IconSearch, IconClipboardCheck, IconX,
+    IconSearch, IconClipboardCheck, IconX, IconDotsVertical, IconPackageImport, IconAlertTriangle
 } from '@tabler/icons-react';
 import { getInventorySummary, performInventoryCount, extractErrorMessage } from '../api/services';
 import { InventoryItem, InventoryCountPayload } from '../api/types';
 import { EmptyState } from '../components/common/EmptyState';
-import { getExpiryStatus } from '../utils/expiry';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import { useNavigate } from 'react-router-dom';
+
+dayjs.extend(relativeTime);
 
 // --- Count Modal Component ---
 function CountModal({ item, opened, onClose }: { item: InventoryItem | null, opened: boolean, onClose: () => void }) {
@@ -104,6 +108,7 @@ export default function Inventory() {
     const [search, setSearch] = useState('');
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [opened, { open, close }] = useDisclosure(false);
+    const navigate = useNavigate();
 
     // Fetch Inventory
     const { data, isLoading } = useQuery({
@@ -125,38 +130,66 @@ export default function Inventory() {
     };
 
     const rows = filteredItems.map((item) => {
-        const expiryStatus = getExpiryStatus(item.expiry_date);
+        const isExpired = item.expiry_date && dayjs(item.expiry_date).isBefore(dayjs());
+        const isExpiringSoon = item.expiry_date && dayjs(item.expiry_date).diff(dayjs(), 'day') < 30 && !isExpired;
+        const hasSurplus = item.surplus_qty > 0;
+
+        let rowColor = undefined;
+        if (isExpired) rowColor = 'var(--mantine-color-red-1)';
+        else if (isExpiringSoon) rowColor = 'var(--mantine-color-orange-1)';
 
         return (
-            <Table.Tr key={`${item.location_id}-${item.article_id}-${item.batch_id}`}>
-                <Table.Td>{item.location_code}</Table.Td>
+            <Table.Tr key={`${item.location_id}-${item.article_id}-${item.batch_id}`} bg={rowColor}>
                 <Table.Td>
-                    <Text size="sm" fw={500}>{item.article_no}</Text>
+                    <Group gap="xs">
+                        <Text size="sm" fw={500}>{item.article_no}</Text>
+                        {hasSurplus && <Badge size="xs" color="cyan" circle>S</Badge>}
+                        {isExpired && <Tooltip label="Expired"><IconAlertTriangle size={14} color="red" /></Tooltip>}
+                    </Group>
                     <Text size="xs" c="dimmed">{item.description}</Text>
                 </Table.Td>
                 <Table.Td>{item.batch_code}</Table.Td>
                 <Table.Td>
                     {item.expiry_date ? (
-                        <Badge
-                            color={expiryStatus === 'expired' ? 'red' : (expiryStatus === 'soon' ? 'orange' : 'gray')}
-                            variant={expiryStatus === 'expired' ? 'filled' : 'light'}
-                        >
+                        <Text c={isExpired ? 'red' : (isExpiringSoon ? 'orange' : undefined)} size="sm">
                             {dayjs(item.expiry_date).format('DD.MM.YYYY')}
-                        </Badge>
+                        </Text>
                     ) : '-'}
                 </Table.Td>
-                <Table.Td fw={700}>{item.stock_qty.toFixed(2)}</Table.Td>
-                <Table.Td>{item.surplus_qty.toFixed(2)}</Table.Td>
-                <Table.Td fw={900} c="blue">{item.total_qty.toFixed(2)}</Table.Td>
+                <Table.Td fw={700} align="right">{item.total_qty.toFixed(2)}</Table.Td>
+                <Table.Td align="right">
+                    <Text c="dimmed" size="sm">Pending...</Text>
+                </Table.Td>
                 <Table.Td>
-                    <Button
-                        size="xs"
-                        variant="subtle"
-                        leftSection={<IconClipboardCheck size={14} />}
-                        onClick={() => openCountModal(item)}
-                    >
-                        Count
-                    </Button>
+                    <Menu shadow="md" width={200} position="bottom-end">
+                        <Menu.Target>
+                            <ActionIcon variant="subtle" color="gray">
+                                <IconDotsVertical size={16} />
+                            </ActionIcon>
+                        </Menu.Target>
+
+                        <Menu.Dropdown>
+                            <Menu.Label>Actions</Menu.Label>
+                            <Menu.Item
+                                leftSection={<IconPackageImport size={14} />}
+                                onClick={() => navigate('/receiving', {
+                                    state: {
+                                        article_id: item.article_id,
+                                        article_no: item.article_no,
+                                        description: item.description
+                                    }
+                                })}
+                            >
+                                Receive More
+                            </Menu.Item>
+                            <Menu.Item
+                                leftSection={<IconClipboardCheck size={14} />}
+                                onClick={() => openCountModal(item)}
+                            >
+                                Inventory Count
+                            </Menu.Item>
+                        </Menu.Dropdown>
+                    </Menu>
                 </Table.Td>
             </Table.Tr>
         );
@@ -189,14 +222,12 @@ export default function Inventory() {
                         <Table striped highlightOnHover>
                             <Table.Thead>
                                 <Table.Tr>
-                                    <Table.Th>Location</Table.Th>
                                     <Table.Th>Article</Table.Th>
                                     <Table.Th>Batch</Table.Th>
                                     <Table.Th>Expiry</Table.Th>
-                                    <Table.Th>Stock (KG)</Table.Th>
-                                    <Table.Th>Surplus (KG)</Table.Th>
-                                    <Table.Th>Total (KG)</Table.Th>
-                                    <Table.Th w={100}></Table.Th>
+                                    <Table.Th style={{ textAlign: 'right' }}>Total Qty (KG)</Table.Th>
+                                    <Table.Th style={{ textAlign: 'right' }}>Last Used</Table.Th>
+                                    <Table.Th w={50}></Table.Th>
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>{rows}</Table.Tbody>
@@ -210,6 +241,6 @@ export default function Inventory() {
                 opened={opened}
                 onClose={() => { close(); setSelectedItem(null); }}
             />
-        </Container>
+        </Container >
     );
 }

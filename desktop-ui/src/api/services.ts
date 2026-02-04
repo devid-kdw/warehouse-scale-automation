@@ -42,6 +42,13 @@ export const deleteArticle = async (id: number) => {
     return response.data;
 };
 
+export const resolveArticle = async (query: string) => {
+    const response = await apiClient.get<Article>(API_ENDPOINTS.ARTICLES.RESOLVE, {
+        params: { query }
+    });
+    return response.data;
+};
+
 // --- Batches ---
 export const getBatchesByArticle = async (articleNo: string) => {
     const response = await apiClient.get<{ items: Batch[], total: number }>(

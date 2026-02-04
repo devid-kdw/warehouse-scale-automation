@@ -7,9 +7,9 @@ import { DateInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { IconCheck, IconX, IconPackageImport } from '@tabler/icons-react';
+import { IconCheck, IconX, IconPackageImport, IconInfoCircle } from '@tabler/icons-react';
 import dayjs from 'dayjs';
-import { getArticles, receiveStock, extractErrorMessage } from '../../api/services';
+import { getArticles, receiveStock, extractErrorMessage, getBatchesByArticle } from '../../api/services';
 import { useAppSettings } from '../../hooks/useAppSettings';
 
 export default function Receiving() {
@@ -50,6 +50,20 @@ export default function Receiving() {
             article_no: a.article_no
         })),
     });
+
+    // Fetch Batches for selected article (for visual feedback)
+    const batchesQuery = useQuery({
+        queryKey: ['batches', form.values.article_id],
+        queryFn: () => {
+            const article = articlesQuery.data?.find(a => a.value === form.values.article_id);
+            return article ? getBatchesByArticle(article.article_no) : { items: [], total: 0 };
+        },
+        enabled: !!form.values.article_id,
+    });
+
+    // Batch Status Logic
+    const existingBatch = batchesQuery.data?.items.find(b => b.batch_code === form.values.batch_code);
+    const isNewBatch = form.values.batch_code.length >= 4 && !existingBatch;
 
     // Receive Mutation
     const mutation = useMutation({
@@ -129,7 +143,18 @@ export default function Receiving() {
                             description="4-5 digits (Mankiewicz) or 9-12 digits (Akzo)"
                             {...form.getInputProps('batch_code')}
                             required
+                            rightSection={existingBatch ? <IconCheck color="green" size={16} /> : (isNewBatch ? <IconInfoCircle color="blue" size={16} /> : null)}
                         />
+                        {existingBatch && (
+                            <Text size="xs" c="green" mt={-10} mb="sm">
+                                Existing Batch found. Expiry: {existingBatch.expiry_date}
+                            </Text>
+                        )}
+                        {isNewBatch && !batchesQuery.isLoading && (
+                            <Text size="xs" c="blue" mt={-10} mb="sm">
+                                New Batch will be created.
+                            </Text>
+                        )}
 
                         <DateInput
                             label="Expiry Date"

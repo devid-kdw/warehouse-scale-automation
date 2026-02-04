@@ -7,6 +7,7 @@ import {
     logout,
     getBaseUrl
 } from './auth';
+import { notifications } from '@mantine/notifications';
 
 // Default configuration
 const DEFAULT_BASE_URL = 'http://localhost:5001';
@@ -102,6 +103,11 @@ apiClient.interceptors.response.use(
             if (!refreshToken) {
                 // No refresh token, logout
                 logout();
+                notifications.show({
+                    title: 'Session Expired',
+                    message: 'Please login again.',
+                    color: 'red',
+                });
                 window.location.hash = '#/login';
                 return Promise.reject(error);
             }
@@ -128,11 +134,25 @@ apiClient.interceptors.response.use(
                 // Refresh failed, logout
                 processQueue(refreshError as Error, null);
                 logout();
+                notifications.show({
+                    title: 'Session Expired',
+                    message: 'Please login again.',
+                    color: 'red',
+                });
                 window.location.hash = '#/login';
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
             }
+        }
+
+        // Handle 403 Forbidden
+        if (error.response?.status === 403) {
+            notifications.show({
+                title: 'Insufficient Permissions',
+                message: 'You do not have permission to perform this action.',
+                color: 'red',
+            });
         }
 
         return Promise.reject(error);

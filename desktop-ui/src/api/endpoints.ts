@@ -7,6 +7,7 @@ export const API_ENDPOINTS = {
     ARTICLES: {
         LIST: '/api/articles',
         CREATE: '/api/articles',
+        RESOLVE: '/api/articles/resolve',
         GET: (articleNo: string) => `/api/articles/${articleNo}`,
         ARCHIVE: (id: number) => `/api/articles/${id}/archive`,
         RESTORE: (id: number) => `/api/articles/${id}/restore`,
