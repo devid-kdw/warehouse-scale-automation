@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
     Container, Title, Paper, Table, Group, Button, TextInput,
     Badge, LoadingOverlay, Modal, NumberInput, Stack, Text
@@ -31,6 +31,14 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
         },
     });
 
+    // Reset form when item changes
+    useEffect(() => {
+        if (item) {
+            form.setFieldValue('counted_qty', item.total_qty);
+            form.setFieldValue('note', '');
+        }
+    }, [item]);
+
     const countMutation = useMutation({
         mutationFn: (values: typeof form.values) => {
             const payload: InventoryCountPayload = {
@@ -54,10 +62,7 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
         }
     });
 
-    // Reset form when item changes
-    if (item && form.values.counted_qty === 0 && !form.isDirty()) {
-        form.setFieldValue('counted_qty', item.total_qty);
-    }
+    // Reset logic moved to useEffect
 
     return (
         <Modal opened={opened} onClose={onClose} title="Perform Inventory Count" centered>

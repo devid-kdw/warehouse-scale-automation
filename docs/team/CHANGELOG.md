@@ -8,6 +8,43 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-04 - Agent Documentation Infrastructure
+**What**: Created comprehensive documentation system for multi-agent coordination.
+
+**Why**: Enable clear agent boundaries, testing protocols, and reduce confusion when assigning tasks to Frontend, Backend, and Testing agents.
+
+**Changes**:
+- Created `docs/team/TESTING_AGENT_RULES.md` - Testing agent protocol (320 lines)
+  - Manual browser testing workflow
+  - Test report format and bug severity guidelines
+  - Application access methods (Electron vs Browser: http://localhost:5173)
+  - Required reading checklist
+  
+- Created `docs/team/AGENT_INSTRUCTIONS.md` - Full instructions for all 3 agents
+  - Frontend Agent: boundaries, tech stack, RBAC integration, quality gates
+  - Backend Agent: code standards, transaction types, RBAC enforcement
+  - Testing Agent: access methods, credentials, test patterns
+  
+- Created `docs/team/QUICK_AGENT_BRIEFINGS.md` - Copy-paste ready briefings
+  - One briefing per agent type for task assignment
+  - Quick reference for orchestrator
+  
+- Created `docs/team/DEVELOPMENT_SETUP.md` - Complete setup guide
+  - Correct Python commands (pip3, python3)
+  - Troubleshooting section (5 common errors)
+  - Verification steps and test data management
+  
+- Updated `README.md`:
+  - Simplified Quick Start with accurate commands
+  - Added links to all new documentation
+  - Fixed Python/pip commands (python3, pip3)
+
+**How to Test**: N/A - Documentation only
+
+**Ref**: Orchestrator setup
+
+---
+
 ### 2026-02-03 - Receiving Workflow Implementation
 **What**: Implemented stock receiving (INBOUND) workflow with `POST /api/inventory/receive` endpoint.
 

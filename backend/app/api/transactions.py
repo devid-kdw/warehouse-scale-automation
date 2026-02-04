@@ -90,7 +90,7 @@ class TransactionList(MethodView):
                 'client_event_id': tx.client_event_id,
                 'meta': tx.meta,
                 'article_no': tx.article.article_no if tx.article else None,
-                'batch_code': tx.batch_code if hasattr(tx.batch, 'batch_code') else (tx.batch.batch_code if tx.batch else None),
+                'batch_code': tx.batch.batch_code if tx.batch else None,
                 'location_code': tx.location.code if tx.location else None
             }
             items.append(tx_dict)

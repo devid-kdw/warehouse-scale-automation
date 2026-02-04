@@ -4,6 +4,26 @@ This is a running log of daily progress. Keep entries brief (3-5 sentences max).
 
 ---
 
+## 2026-02-04 (Tuesday)
+
+**Danas**:
+- Pomoć Stefanu s backend setup-om (pip3 umjesto pip, python3 umjesto python)
+- ✅ **Kompletna agent dokumentacija kreirana**:
+  - `TESTING_AGENT_RULES.md` - testing protocol (320 linija)
+  - `AGENT_INSTRUCTIONS.md` - upute za Frontend/Backend/Testing agente
+  - `QUICK_AGENT_BRIEFINGS.md` - copy-paste briefinzi
+  - `DEVELOPMENT_SETUP.md` - setup guide s troubleshooting
+- Updatean `README.md` s linkovima na svu dokumentaciju
+- Točne upute za testiranje aplikacije (Electron + Browser: http://localhost:5173)
+
+**Sutra**:
+- Spremno za task assignmente agentima
+- Čekam sljedeće feature zadatke
+
+**Blok**: None
+
+---
+
 ## 2026-02-03 (Monday) - Evening Update
 
 **Danas**: 

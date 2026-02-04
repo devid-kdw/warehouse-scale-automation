@@ -146,7 +146,7 @@ export default function Receiving() {
                             placeholder="0.00"
                             decimalScale={2}
                             fixedDecimalScale
-                            min={0.01}
+                            min={0}
                             step={0.01}
                             {...form.getInputProps('quantity_kg')}
                             required
