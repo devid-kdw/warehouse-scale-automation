@@ -8,6 +8,28 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-07 - Final Fixes (v2.1)
+**What**: Critical bug fixes for Consumables in Bulk Entry and Electron Security hardening.
+
+**Why**: Fix blocking issue where Consumables required batch selection, and improve application security.
+
+**Changes**:
+- **Frontend (TASK-0014)**:
+  - **Bulk Entry**: Consumables now hide Batch Select and show "System Batch (NA)".
+  - **Security**: Disabled `nodeIntegration` in Electron to prevent renderer process risks.
+- **Backend (TASK-0015)**:
+  - **Schema**: `DraftGroupLineSchema` now allows `batch_id=null`.
+  - **Service**: Auto-assigns "NA" system batch for consumables if `batch_id` is missing.
+  - **Refactor**: Shared `batch_service` logic for system batch creation.
+
+**How to Test**:
+- Bulk Entry: Add Consumable -> Batch dropdown hidden -> Submit -> Success.
+- Electron: App runs without console errors accessing Node APIs.
+
+**Ref**: TASK-0014, TASK-0015
+
+---
+
 ### 2026-02-07 - Core Refinement v2
 **What**: Backend and Frontend updates for stricter data integrity and better UX.
 

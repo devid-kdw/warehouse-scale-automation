@@ -1,4 +1,5 @@
-# Warehouse Scale Automation
+# Warehouse Scale Automation v1.1.0-beta
+![Status](https://img.shields.io/badge/Status-Stabilization-yellow)
 
 Internal warehouse system for paint inventory management with staging/approval workflow and audit trail.
 
@@ -19,6 +20,7 @@ warehouse-scale-automation/
 - **[Project Specification](./PROJECT_SPECIFICATION.md)** - Comprehensive technical specification
 - **[Development Setup](./docs/team/DEVELOPMENT_SETUP.md)** - Step-by-step setup guide with troubleshooting
 - **[Agent Instructions](./docs/team/AGENT_INSTRUCTIONS.md)** - Instructions for Frontend, Backend, and Testing agents
+- **[Orchestrator Handbook](./docs/team/ORCHESTRATOR.md)** - Operational guide for project lead
 - **[Changelog](./docs/team/CHANGELOG.md)** - All changes tracked with test instructions
 - **[Decisions](./docs/team/DECISIONS.md)** - Architectural and policy decisions
 - **[Migrations](./docs/team/MIGRATIONS.md)** - Database schema evolution
@@ -44,6 +46,20 @@ cp .env.example .env
 flask db upgrade
 flask seed
 python3 run.py
+```
+
+#### 🆘 Database Troubleshooting (Migration Mismatch)
+If you encounter migration errors (e.g., `alembic_version` mismatch):
+
+```bash
+# ⚠️ WARNING: This wipes the database!
+rm backend/warehouse.db  # If using SQLite
+# OR for PostgreSQL: DROP SCHEMA public CASCADE; CREATE SCHEMA public;
+
+# Then re-init:
+flask db upgrade
+flask seed
+```
 ```
 
 Backend runs on: **http://localhost:5001**

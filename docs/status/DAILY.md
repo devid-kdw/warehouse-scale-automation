@@ -11,6 +11,10 @@ This is a running log of daily progress. Keep entries brief (3-5 sentences max).
   - **Backend**: Transaction `order_number` + Index, Grouping API, Atomic Approvals.
   - **Frontend**: Manual/Scale toggle, Barcode Listener, Inventory Tabs, Order Number in Receiving.
   - **Docs**: Updated Changelog and created Task Briefs.
+- ✅ **Final Fixes (v2.1)**:
+  - **Solved**: Bulk Entry Consumables (System Batch logic).
+  - **Secured**: Electron `nodeIntegration` disabled.
+  - **Verified**: Full regression test passed (except one known test-path issue).
 
 **Sutra**:
 - Deployment preparation (Raspberry Pi setup).

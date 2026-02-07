@@ -203,6 +203,12 @@ Each article exists in batches.
 **Expiry date:**
 - REQUIRED for receiving workflow.
 
+**System Batch (Consumables):**
+- Syntax: `batch_code='NA'`
+- Expiry: `2099-12-31`
+- Used for: Non-batch-tracked items (consumables).
+- Logic: Frontend sends `batch_id=null` for consumables; Backend maps to 'NA' batch.
+
 ---
 
 ## 9. STOCK vs SURPLUS
