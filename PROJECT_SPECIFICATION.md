@@ -1,4 +1,4 @@
-# Warehouse Scale Automation - Project Specification v1.1
+# Warehouse Scale Automation - Project Specification v2.1
 
 ## 0. Overview
 
@@ -7,19 +7,23 @@ Internal warehouse system for paint inventory (later: consumables) with emphasis
 - **Staging/approval workflow**: nothing changes stock until admin approves
 - **Audit trail** and reports (exportable to Excel/SAP template)
 
-### Core v1.1 Scope (Software-first, no hardware)
+### Core v2.1 Scope (Software-first, no hardware)
+- **Draft Groups**: Atomic multi-line approval.
+- **Stock Receiving**: Inbound workflow with order numbers.
+- **Consumables**: System batch logic.
+- **Security**: JWT Auth + Electron Hardening.
 
 | Domain | Tables |
 |--------|--------|
 | Master Data | `articles`, `batches`, `locations` |
 | Inventory | `stock`, `surplus` |
-| Staging | `weigh_in_drafts` |
+| Staging | `weigh_in_drafts`, `draft_groups` |
 | Approval | `approval_actions` |
 | Audit | `transactions` |
-| Users | `users` (minimal, role-based) |
+| Users | `users` (RBAC: Admin/Operator) |
 
 > [!NOTE]
-> Hardware integration (scale, barcode) is **NOT** in v1.1. UI uses manual input; hardware plugs in later as alternative input source.
+> Hardware integration (scale, barcode) is **NOT** in v2.1. UI uses manual input; hardware plugs in later as alternative input source.
 
 ---
 
@@ -123,16 +127,20 @@ warehouse-scale-automation/
 | Endpoint | Auth Required |
 |----------|---------------|
 | `GET /health` | ❌ Public |
-| All other endpoints | ✅ Bearer token |
+| `POST /api/auth/login` | ❌ Public (Rate Limited) |
+| All other endpoints | ✅ Bearer token (JWT) |
 
 **Auth header format:**
 ```
-Authorization: Bearer <API_TOKEN>
+Authorization: Bearer <access_token>
 ```
 
 > [!IMPORTANT]
-> No login system in v1.1. The `users` table exists for audit purposes:
-> - `created_by_user_id` and `actor_user_id` are FK to `users`
+> **JWT Implementation**:
+> - Access Token: 15 minutes
+> - Refresh Token: 7 days
+> - RBAC: Enforced via `@require_roles` decorator.
+> - Electron: `nodeIntegration: false` for security.
 
 ---
 
