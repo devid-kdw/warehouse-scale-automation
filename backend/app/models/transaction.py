@@ -45,11 +45,17 @@ class Transaction(db.Model):
     client_event_id = db.Column(db.Text, nullable=True, index=True)
     meta = db.Column(db.JSON, nullable=True)
     
+    # New fields for TASK-0010
+    order_number = db.Column(db.String(50), nullable=True)
+    
     # Indexes
     __table_args__ = (
         db.Index('ix_transactions_occurred_at', 'occurred_at'),
         db.Index('ix_transactions_article_occurred', 'article_id', 'occurred_at'),
         db.Index('ix_transactions_batch_occurred', 'batch_id', 'occurred_at'),
+        # New indexes for TASK-0010
+        db.Index('ix_transactions_type_created', 'tx_type', 'occurred_at'),
+        db.Index('ix_transactions_order_number', 'order_number'),
     )
     
     # Relationships
@@ -85,5 +91,6 @@ class Transaction(db.Model):
             'user_id': self.user_id,
             'source': self.source,
             'client_event_id': self.client_event_id,
+            'order_number': self.order_number,
             'meta': self.meta
         }

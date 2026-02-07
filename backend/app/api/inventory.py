@@ -6,7 +6,7 @@ from marshmallow import Schema, fields, validate
 
 from ..extensions import db
 from ..auth import require_roles
-from ..models import Stock, Surplus, Article, Batch, Location
+from ..models import Stock, Surplus, Article, Batch, Location, Transaction, User
 from ..services.inventory_service import adjust_inventory
 from ..services import inventory_count_service
 from ..services.receiving_service import receive_stock
@@ -18,7 +18,9 @@ from ..schemas.inventory import (
     InventoryCountRequestSchema,
     InventoryCountResponseSchema,
     StockReceiveRequestSchema,
-    StockReceiveResponseSchema
+    StockReceiveRequestSchema,
+    StockReceiveResponseSchema,
+    ReceiptHistoryResponseSchema
 )
 
 blp = Blueprint(
@@ -334,9 +336,11 @@ class InventoryReceive(MethodView):
                 quantity_kg=data['quantity_kg'],
                 expiry_date=data['expiry_date'],
                 actor_user_id=actor_user_id,
+                order_number=data['order_number'],
                 location_id=data.get('location_id', 1),
                 received_date=data.get('received_date'),
-                note=data.get('note')
+                note=data.get('note'),
+                client_event_id=data.get('client_event_id')
             )
             db.session.commit()
             return result, 201
@@ -354,4 +358,80 @@ class InventoryReceive(MethodView):
                     'details': e.details
                 }
             }, status_code
+
+
+@blp.route('/receipts')
+class ReceiptHistory(MethodView):
+    """Receipt history resource."""
+    
+    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.response(200, ReceiptHistoryResponseSchema)
+    @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
+    @jwt_required()
+    @require_roles('ADMIN')
+    def get(self):
+        """Get receipt history (grouped).
+        
+        Returns STOCK_RECEIPT transactions grouped by client_event_id (if present)
+        or treated as single receipts.
+        """
+        # Query all stock receipts
+        # Join Article, User, Batch for details
+        query = db.session.query(
+            Transaction, Article, Batch, User
+        ).join(
+            Article, Transaction.article_id == Article.id
+        ).join(
+            Batch, Transaction.batch_id == Batch.id
+        ).outerjoin(
+            User, Transaction.user_id == User.id
+        ).filter(
+            Transaction.tx_type == Transaction.TX_STOCK_RECEIPT
+        ).order_by(
+            Transaction.occurred_at.desc()
+        )
+        
+        results = query.all()
+        
+        # Grouping logic
+        receipts_map = {}
+        
+        for tx, article, batch, user in results:
+            # Determine grouping key
+            if tx.client_event_id:
+                key = tx.client_event_id
+            else:
+                # Fallback for old data or single receipts: use transaction ID
+                key = f"tx-{tx.id}"
+            
+            if key not in receipts_map:
+                receipts_map[key] = {
+                    'receipt_key': key,
+                    'order_number': tx.order_number,
+                    'received_at': tx.occurred_at,
+                    'line_count': 0,
+                    'total_quantity': 0.0,
+                    'lines': []
+                }
+            
+            # Aggregate
+            group = receipts_map[key]
+            group['line_count'] += 1
+            group['total_quantity'] += float(tx.quantity_kg)
+            
+            # Add item detail
+            group['lines'].append({
+                'transaction_id': tx.id,
+                'article_no': article.article_no,
+                'description': article.description,
+                'batch_code': batch.batch_code,
+                'quantity_kg': float(tx.quantity_kg),
+                'user_name': user.username if user else 'Unknown'
+            })
+            
+        # Convert map to list
+        history = list(receipts_map.values())
+        
+        return {'history': history, 'total': len(history)}
 
