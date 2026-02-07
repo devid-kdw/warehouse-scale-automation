@@ -67,44 +67,29 @@ class DraftList(MethodView):
         Uses JWT identity as created_by_user_id.
         Requires client_event_id for idempotency.
         Quantity must be between 0.01 and 9999.99 kg.
-        """
-        # Get user from JWT
-        current_user_id = get_jwt_identity()
         
-        # Validate location exists
+        Backward compatibility: Auto-creates a DraftGroup for this single draft.
+        """
+        from ..services import draft_group_service
+        
+        # Get user from JWT
+        current_user_id = int(get_jwt_identity())
+        
+        # Validate existence (basic check before service call)
         location = db.session.get(Location, draft_data['location_id'])
         if not location:
-            return {
-                'error': {
-                    'code': 'LOCATION_NOT_FOUND',
-                    'message': f"Location ID {draft_data['location_id']} not found",
-                    'details': {}
-                }
-            }, 404
-        
-        # Validate article exists
+            return {'error': {'code': 'LOCATION_NOT_FOUND', 'message': f"Location ID {draft_data['location_id']} not found", 'details': {}}}, 404
+            
+        # Article/Batch check (optional, but good for error reporting before service)
         article = db.session.get(Article, draft_data['article_id'])
         if not article:
-            return {
-                'error': {
-                    'code': 'ARTICLE_NOT_FOUND',
-                    'message': f"Article ID {draft_data['article_id']} not found",
-                    'details': {}
-                }
-            }, 404
+            return {'error': {'code': 'ARTICLE_NOT_FOUND', 'message': f"Article ID {draft_data['article_id']} not found", 'details': {}}}, 404
         
-        # Validate batch exists
         batch = db.session.get(Batch, draft_data['batch_id'])
         if not batch:
-            return {
-                'error': {
-                    'code': 'BATCH_NOT_FOUND',
-                    'message': f"Batch ID {draft_data['batch_id']} not found",
-                    'details': {}
-                }
-            }, 404
-        
-        # Check for duplicate client_event_id
+            return {'error': {'code': 'BATCH_NOT_FOUND', 'message': f"Batch ID {draft_data['batch_id']} not found", 'details': {}}}, 404
+
+        # Check for duplicate client_event_id (idempotency)
         existing = WeighInDraft.query.filter_by(
             client_event_id=draft_data['client_event_id']
         ).first()
@@ -116,22 +101,26 @@ class DraftList(MethodView):
                     'details': {'client_event_id': draft_data['client_event_id']}
                 }
             }, 409
+
+        # Use group service to create a 1-line group
+        line = {
+            'article_id': draft_data['article_id'],
+            'batch_id': draft_data['batch_id'],
+            'quantity_kg': draft_data['quantity_kg'],
+            'draft_type': draft_data.get('draft_type', WeighInDraft.DRAFT_TYPE_WEIGH_IN),
+            'client_event_id': draft_data['client_event_id'],
+            'note': draft_data.get('note')
+        }
         
-        # Round quantity to 2 decimal places
-        quantity = Decimal(str(draft_data['quantity_kg'])).quantize(
-            Decimal('0.01'),
-            rounding=ROUND_HALF_UP
+        group = draft_group_service.create_group(
+            location_id=draft_data['location_id'],
+            user_id=current_user_id,
+            lines=[line],
+            source='ui_operator'
         )
-        draft_data['quantity_kg'] = quantity
         
-        # Set created_by from JWT
-        draft_data['created_by_user_id'] = current_user_id
-        
-        draft = WeighInDraft(**draft_data)
-        db.session.add(draft)
-        db.session.commit()
-        
-        return draft, 201
+        # Return the created draft (first and only one in group)
+        return group.drafts[0], 201
 
 
 @blp.route('/<int:draft_id>')

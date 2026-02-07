@@ -19,6 +19,10 @@ ERROR_CODES = {
     'BATCH_NOT_FOUND': 404,
     'LOCATION_NOT_FOUND': 404,
     'USER_NOT_FOUND': 404,
+    'BATCH_REQUIRED': 400,
+    'GROUP_NOT_FOUND': 404,
+    'GROUP_NOT_DRAFT': 409,
+    'GROUP_EMPTY': 400,
     'INTERNAL_ERROR': 500,
 }
 
@@ -62,22 +66,37 @@ class AppError(Exception):
 class InsufficientStockError(AppError):
     """Raised when stock is insufficient for the requested operation."""
     
-    def __init__(self, required: float, available: float, available_surplus: float = 0):
+    def __init__(self, required: float, available: float, available_surplus: float = 0, message: str = None):
         details = {
             'required_kg': required,
             'available_stock_kg': available,
             'available_surplus_kg': available_surplus,
             'shortage_kg': round(required - available - available_surplus, 2)
         }
+        if not message:
+            message = f'Insufficient inventory: required {required}kg, available {available + available_surplus}kg (stock: {available}kg, surplus: {available_surplus}kg)'
         super().__init__(
             code='INSUFFICIENT_STOCK',
-            message=f'Insufficient inventory: required {required}kg, available {available + available_surplus}kg (stock: {available}kg, surplus: {available_surplus}kg)',
+            message=message,
             details=details
         )
 
 
 def register_error_handlers(app):
     """Register error handlers on Flask app."""
+    from flask_limiter import RateLimitExceeded
+    
+    @app.errorhandler(RateLimitExceeded)
+    def handle_rate_limit_error(error):
+        return error_response(
+            'RATE_LIMIT_EXCEEDED',
+            'Too many requests',
+            {
+                'limit': str(error.description),
+                'retry_after': getattr(error, 'retry_after', None)
+            },
+            status_code=429
+        )
     
     @app.errorhandler(AuthError)
     def handle_auth_error(error):

@@ -159,10 +159,4 @@ apiClient.interceptors.response.use(
     }
 );
 
-// Legacy storage keys (removed, now using auth.ts)
-// Storage keys
-export const STORAGE_KEYS = {
-    BASE_URL: 'app_base_url',
-    API_TOKEN: 'app_api_token',
-    ACTOR_ID: 'app_actor_id',
-};
+

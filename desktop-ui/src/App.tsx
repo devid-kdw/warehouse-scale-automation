@@ -3,7 +3,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell, Group, Text, Button, Menu } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconLogout, IconUser } from '@tabler/icons-react';
-import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
@@ -14,11 +13,10 @@ import Batches from './pages/Batches';
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import Receiving from './pages/Receiving';
+import ReceiptHistory from './pages/Inventory/ReceiptHistory';
 import logo from './assets/enikon-logo.jpg';
-import {
-    logout,
-    AuthState
-} from './api/auth';
+import BulkDraftEntry from './pages/Drafts/BulkDraftEntry';
+import { logout } from './api/auth';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -122,6 +120,9 @@ function Layout() {
                     <Route path="/drafts" element={
                         <RequireAdmin><DraftApproval /></RequireAdmin>
                     } />
+                    <Route path="/drafts/bulk" element={
+                        <RequireAdmin><BulkDraftEntry /></RequireAdmin>
+                    } />
                     <Route path="/articles" element={
                         <RequireAdmin><Articles /></RequireAdmin>
                     } />
@@ -133,6 +134,9 @@ function Layout() {
                     } />
                     <Route path="/receiving" element={
                         <RequireAdmin><Receiving /></RequireAdmin>
+                    } />
+                    <Route path="/inventory/receipts" element={
+                        <RequireAdmin><ReceiptHistory /></RequireAdmin>
                     } />
                     <Route path="/reports" element={
                         <RequireAdmin><Reports /></RequireAdmin>

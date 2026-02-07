@@ -14,6 +14,9 @@ def approve_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None)
     Delegates to specific handler based on draft_type:
     - WEIGH_IN: surplus-first consumption (existing logic)
     - INVENTORY_SHORTAGE: stock-only consumption (new logic)
+    
+    WARNING: THIS FUNCTION DOES NOT COMMIT. Caller is responsible for 
+    calling db.session.commit() to finalize the transaction.
     """
     # 1. Lock draft FOR UPDATE and validate
     draft = db.session.query(WeighInDraft).filter_by(
@@ -277,17 +280,8 @@ def reject_draft(draft_id: int, actor_user_id: int, note: Optional[str] = None) 
     
     No inventory changes occur on rejection.
     
-    Args:
-        draft_id: ID of the draft to reject
-        actor_user_id: ID of the user performing the rejection
-        note: Optional note for the rejection
-        
-    Returns:
-        dict with rejection result
-        
-    Raises:
-        AppError: If draft not found or not in DRAFT status
-        AppError: If actor user not found
+    WARNING: THIS FUNCTION DOES NOT COMMIT. Caller is responsible for 
+    calling db.session.commit() to finalize the transaction.
     """
     # Lock draft FOR UPDATE
     draft = db.session.query(WeighInDraft).filter_by(

@@ -8,6 +8,31 @@ Format: **Migration Name** | **What Changed** | **Backwards Compatible** | **App
 
 ## Existing Migrations
 
+### add_draft_groups - Draft Groups and Backfill
+**File**: `backend/migrations/versions/add_draft_groups_manual.py`
+
+**What Changed**:
+- Created `draft_groups` table.
+- Added `draft_group_id` FK to `weigh_in_drafts`.
+- **Data Migration**: Automatically backfilled all existing drafts into new individual groups.
+- Added indices for group-based lookups and status filtering.
+
+**Backwards Compatible**: ✅ Yes - v1 API automatically wraps drafts in groups.
+
+**How to Apply**:
+```bash
+cd backend
+export FLASK_APP=run.py
+venv/bin/python3 -m flask db upgrade
+```
+
+**How to Rollback**:
+```bash
+venv/bin/python3 -m flask db downgrade add_draft_groups
+```
+
+---
+
 ### c1d4f113222c - Initial Migration
 **File**: `backend/migrations/versions/c1d4f113222c_initial_migration.py`
 

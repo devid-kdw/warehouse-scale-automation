@@ -30,6 +30,11 @@ class User(db.Model):
         back_populates='created_by_user',
         foreign_keys='WeighInDraft.created_by_user_id'
     )
+    created_draft_groups = db.relationship(
+        'DraftGroup',
+        back_populates='created_by_user',
+        foreign_keys='DraftGroup.created_by_user_id'
+    )
     approval_actions = db.relationship(
         'ApprovalAction',
         back_populates='actor_user',

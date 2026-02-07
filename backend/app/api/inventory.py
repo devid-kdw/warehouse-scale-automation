@@ -226,8 +226,8 @@ class InventorySummary(MethodView):
         
         items = []
         for batch, article, stock, surplus in results:
-            stock_qty = stock.quantity_kg if stock else 0.0
-            surplus_qty = surplus.quantity_kg if surplus else 0.0
+            stock_qty = float(stock.quantity_kg) if stock else 0.0
+            surplus_qty = float(surplus.quantity_kg) if surplus else 0.0
             
             # Skip if 0 quantity and batch inactive?
             # User wants to see inventory.
@@ -251,11 +251,11 @@ class InventorySummary(MethodView):
                 'description': article.description,
                 'batch_id': batch.id,
                 'batch_code': batch.batch_code,
-                'expiry_date': batch.expiry_date.isoformat() if batch.expiry_date else None,
+                'expiry_date': batch.expiry_date,
                 'stock_qty': float(stock_qty),
                 'surplus_qty': float(surplus_qty),
                 'total_qty': float(stock_qty + surplus_qty),
-                'updated_at': updated_at.isoformat() if updated_at else None
+                'updated_at': updated_at
             })
             
         return {'items': items, 'total': len(items)}

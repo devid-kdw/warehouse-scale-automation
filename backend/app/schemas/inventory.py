@@ -94,13 +94,15 @@ class StockReceiveRequestSchema(Schema):
         required=True,
         metadata={'description': 'Article ID'}
     )
+    order_number = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=50),
+        metadata={'description': 'Order number (e.g. PO-12345)'}
+    )
     batch_code = fields.String(
         required=True,
-        validate=validate.Regexp(
-            BATCH_CODE_PATTERN,
-            error='Invalid batch code. Must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).'
-        ),
-        metadata={'description': 'Batch code: 4-5 or 9-12 digits'}
+        # Regex validation moved to service layer to allow 'NA' for consumables
+        metadata={'description': 'Batch code: 4-5 or 9-12 digits (Paint) or NA (Consumable)'}
     )
     quantity_kg = fields.Decimal(
         required=True,
@@ -145,4 +147,20 @@ class StockReceiveResponseSchema(Schema):
         metadata={'description': 'Quantity received'}
     )
     transaction = fields.Dict(metadata={'description': 'STOCK_RECEIPT transaction'})
+
+
+class ReceiptHistoryItemSchema(Schema):
+    """Schema for grouped receipt history item."""
+    receipt_key = fields.String(metadata={'description': 'Unique grouping key'})
+    order_number = fields.String(allow_none=True)
+    received_at = fields.DateTime()
+    line_count = fields.Integer()
+    total_quantity = fields.Float()
+    lines = fields.List(fields.Dict())
+
+
+class ReceiptHistoryResponseSchema(Schema):
+    """Schema for receipt history response."""
+    history = fields.List(fields.Nested(ReceiptHistoryItemSchema))
+    total = fields.Integer()
 

@@ -2,7 +2,8 @@ import { NavLink as RouterNavLink, useLocation } from 'react-router-dom';
 import { NavLink, Box, Stack, Text, ThemeIcon, Group } from '@mantine/core';
 import {
     IconSettings, IconScale, IconChecklist, IconPackage,
-    IconTags, IconServer, IconPlugConnected, IconPlugX, IconFileSpreadsheet, IconPackageImport
+    IconTags, IconServer, IconPlugConnected, IconPlugX, IconFileSpreadsheet, IconPackageImport,
+    IconHistory, IconTable
 } from '@tabler/icons-react';
 import { useQuery } from '@tanstack/react-query';
 import { checkHealth } from '../api/services';
@@ -28,9 +29,11 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
     const allLinks = [
         // OPERATOR & ADMIN
         { icon: IconScale, label: 'Draft Entry', to: '/drafts/new', roles: ['ADMIN', 'OPERATOR'] },
+        { icon: IconTable, label: 'Bulk Entry', to: '/drafts/bulk', roles: ['ADMIN'] },
 
         // ADMIN ONLY
         { icon: IconPackageImport, label: 'Receive Stock', to: '/receiving', roles: ['ADMIN'] },
+        { icon: IconHistory, label: 'Receipt History', to: '/inventory/receipts', roles: ['ADMIN'] },
         { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN'] },
         { icon: IconChecklist, label: 'Approvals', to: '/drafts', roles: ['ADMIN'] },
         { icon: IconPackage, label: 'Articles', to: '/articles', roles: ['ADMIN'] },

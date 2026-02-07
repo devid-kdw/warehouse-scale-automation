@@ -40,6 +40,11 @@ class WeighInDraft(db.Model):
     client_event_id = db.Column(db.Text, nullable=False, unique=True)
     note = db.Column(db.Text, nullable=True)
     draft_type = db.Column(db.String(20), nullable=False, default='WEIGH_IN')  # WEIGH_IN or INVENTORY_SHORTAGE
+    draft_group_id = db.Column(
+        db.Integer,
+        db.ForeignKey('draft_groups.id', ondelete='RESTRICT'),
+        nullable=True  # Becomes NOT NULL after migration
+    )
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -52,12 +57,14 @@ class WeighInDraft(db.Model):
             'quantity_kg > 0 AND quantity_kg <= 9999.99',
             name='ck_draft_quantity_range'
         ),
+        db.Index('idx_weigh_in_drafts_group_id', 'draft_group_id'),
     )
     
     # Relationships
     location = db.relationship('Location', back_populates='drafts')
     article = db.relationship('Article', back_populates='drafts')
     batch = db.relationship('Batch', back_populates='drafts')
+    draft_group = db.relationship('DraftGroup', back_populates='drafts')
     created_by_user = db.relationship(
         'User',
         back_populates='created_drafts',

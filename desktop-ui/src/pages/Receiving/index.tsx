@@ -10,11 +10,11 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconCheck, IconX, IconPackageImport, IconInfoCircle } from '@tabler/icons-react';
 import dayjs from 'dayjs';
 import { getArticles, receiveStock, extractErrorMessage, getBatchesByArticle } from '../../api/services';
-import { useAppSettings } from '../../hooks/useAppSettings';
+
 
 export default function Receiving() {
     const queryClient = useQueryClient();
-    useAppSettings();
+
 
     const form = useForm({
         initialValues: {

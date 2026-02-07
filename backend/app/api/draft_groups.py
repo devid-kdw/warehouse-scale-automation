@@ -56,22 +56,13 @@ class DraftGroupList(MethodView):
         """
         current_user_id = int(get_jwt_identity())
         
-        try:
-            group = draft_group_service.create_group(
-                location_id=group_data['location_id'],
-                user_id=current_user_id,
-                lines=group_data['lines'],
-                name=group_data.get('name')
-            )
-            return group, 201
-        except AppError as e:
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, 400
+        group = draft_group_service.create_group(
+            location_id=group_data['location_id'],
+            user_id=current_user_id,
+            lines=group_data['lines'],
+            name=group_data.get('name')
+        )
+        return group, 201
 
 
 @blp.route('/<int:group_id>')

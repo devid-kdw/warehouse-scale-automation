@@ -88,7 +88,7 @@ def user(app):
 def article(app):
     """Create test article."""
     with app.app_context():
-        art = Article(article_no='TEST-001', description='Test Article')
+        art = Article(article_no='TEST-001', description='Test Article', uom='KG')
         db.session.add(art)
         db.session.commit()
         art_id = art.id

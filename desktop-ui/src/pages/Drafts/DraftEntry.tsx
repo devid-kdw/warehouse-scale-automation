@@ -13,7 +13,6 @@ import dayjs from 'dayjs';
 import { getArticles, getBatchesByArticle, createDraft } from '../../api/services';
 import { extractErrorMessage } from '../../api/services';
 import { useNavigate } from 'react-router-dom';
-import { useAppSettings } from '../../hooks/useAppSettings';
 import { useAuth } from '../../hooks/useAuth';
 import { getDrafts } from '../../api/services';
 import { Table, Badge } from '@mantine/core';
@@ -23,7 +22,7 @@ import { isAdmin } from '../../api/auth';
 export default function DraftEntry() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
-    useAppSettings();
+
     const { user } = useAuth();
     const [qtyMode, setQtyMode] = useState<'manual' | 'scale'>(
         (localStorage.getItem('draftEntry.qtyMode') as 'manual' | 'scale') || 'manual'

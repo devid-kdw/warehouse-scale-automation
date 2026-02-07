@@ -135,7 +135,7 @@ export interface CreateBatchPayload {
 export interface CreateDraftPayload {
     location_id: number;
     article_id: number;
-    batch_id: number;
+    batch_id: number | null;
     quantity_kg: number;
     client_event_id: string;
     source?: string;
@@ -214,7 +214,7 @@ export interface CreateDraftGroupPayload {
     name?: string;
     lines: Array<{
         article_id: number;
-        batch_id: number;
+        batch_id: number | null;
         quantity_kg: number;
         note?: string;
         client_event_id: string;

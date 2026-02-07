@@ -25,6 +25,7 @@ class Location(db.Model):
     stock_items = db.relationship('Stock', back_populates='location')
     surplus_items = db.relationship('Surplus', back_populates='location')
     drafts = db.relationship('WeighInDraft', back_populates='location')
+    draft_groups = db.relationship('DraftGroup', back_populates='location')
     transactions = db.relationship('Transaction', back_populates='location')
     
     def __repr__(self):

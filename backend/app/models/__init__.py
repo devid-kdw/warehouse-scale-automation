@@ -7,6 +7,7 @@ from .batch import Batch
 from .stock import Stock
 from .surplus import Surplus
 from .weigh_in_draft import WeighInDraft
+from .draft_group import DraftGroup
 from .approval_action import ApprovalAction
 from .transaction import Transaction
 
@@ -19,6 +20,7 @@ __all__ = [
     'Stock',
     'Surplus',
     'WeighInDraft',
+    'DraftGroup',
     'ApprovalAction',
     'Transaction',
 ]

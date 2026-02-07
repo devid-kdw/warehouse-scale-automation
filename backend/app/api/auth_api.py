@@ -4,7 +4,7 @@ from flask_smorest import Blueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from marshmallow import Schema, fields
 
-from ..extensions import db
+from ..extensions import db, limiter
 from ..auth import authenticate_user, create_tokens, get_current_user, AuthError
 from ..models import User
 from ..schemas.common import ErrorResponseSchema
@@ -50,6 +50,7 @@ class Login(MethodView):
     @blp.arguments(LoginSchema)
     @blp.response(200, TokenResponseSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid credentials')
+    @limiter.limit("6 per minute")
     def post(self, credentials):
         """Authenticate user and return JWT tokens.
         

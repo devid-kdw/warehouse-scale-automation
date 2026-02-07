@@ -19,9 +19,11 @@ def receive_stock(
     quantity_kg: Decimal,
     expiry_date: date,
     actor_user_id: int,
+    order_number: str,
     location_id: int = 1,
     received_date: Optional[date] = None,
-    note: Optional[str] = None
+    note: Optional[str] = None,
+    client_event_id: Optional[str] = None
 ) -> dict:
     """Receive stock into inventory.
     
@@ -33,9 +35,11 @@ def receive_stock(
         quantity_kg: Quantity to receive (Decimal, must be > 0)
         expiry_date: Required expiry date
         actor_user_id: User ID from JWT token
+        order_number: REQUIRED order number (e.g. PO-123)
         location_id: Location ID (default=1, only 1 allowed in v1)
         received_date: Date of receipt (defaults to today)
         note: Optional note
+        client_event_id: Optional UUID for grouping/idempotency
         
     Returns:
         dict with receipt result
@@ -63,13 +67,21 @@ def receive_stock(
             {'value': str(quantity_kg)}
         )
     
-    # Validate batch code format
-    if not re.match(BATCH_CODE_PATTERN, batch_code):
+    # Validate order_number
+    if not order_number or not order_number.strip():
         raise AppError(
             'VALIDATION_ERROR',
-            'Invalid batch code format. Must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).',
-            {'batch_code': batch_code}
+            'order_number is required for stock receipt',
+            {'order_number': order_number}
         )
+    
+    # Normalize order number
+    order_number = order_number.strip().upper()
+    
+    # Validate batch code format (only for paint items, handled later)
+    # But for now we just validate regex if we are going to use it? 
+    # Actually logic says if !is_paint -> forcing NA. So regex check should be conditional?
+    # Let's check article first.
     
     # Validate actor user exists and is admin
     user = db.session.get(User, actor_user_id)
@@ -102,6 +114,20 @@ def receive_stock(
         raise AppError('ARTICLE_NOT_FOUND', f'Article {article_id} not found')
     
     # ===== BATCH HANDLING (with lock if exists) =====
+    
+    # Consumables logic (TASK-0010)
+    if not article.is_paint:
+        batch_code = 'NA'
+        expiry_date = date(2099, 12, 31)
+    else:
+        # For paint, validate batch format
+        if not re.match(BATCH_CODE_PATTERN, batch_code):
+            raise AppError(
+                'VALIDATION_ERROR',
+                'Invalid batch code format. Must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).',
+                {'batch_code': batch_code}
+            )
+
     batch_created = False
     
     # Try to find existing batch
@@ -116,6 +142,11 @@ def receive_stock(
             # Backfill: NULL -> set expiry
             batch.expiry_date = expiry_date
         elif batch.expiry_date != expiry_date:
+            # If consumable (NA), we might be more lenient? 
+            # But "System Batch" should strictly be 2099-12-31.
+            # If existing NA batch has different expiry, that's a data issue.
+            # For now, stick to strict check for consistency.
+            
             # Mismatch -> 409 CONFLICT
             raise AppError(
                 'BATCH_EXPIRY_MISMATCH',
@@ -135,7 +166,7 @@ def receive_stock(
             batch_code=batch_code,
             received_date=received_date,
             expiry_date=expiry_date,
-            note=note,
+            note=note if article.is_paint else 'System Batch (Consumable)',
             is_active=True
         )
         db.session.add(batch)
@@ -173,10 +204,13 @@ def receive_stock(
         quantity_kg=quantity_kg,
         user_id=actor_user_id,
         source='receiving',
+        order_number=order_number,
+        client_event_id=client_event_id,
         meta={
             'note': note,
             'received_date': received_date.isoformat(),
-            'batch_created': batch_created
+            'batch_created': batch_created,
+            'is_consumable': not article.is_paint
         }
     )
     db.session.add(tx)
