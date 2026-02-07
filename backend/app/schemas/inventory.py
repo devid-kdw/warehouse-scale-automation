@@ -16,11 +16,11 @@ class InventorySummaryItemSchema(Schema):
     description = fields.String(allow_none=True)
     batch_id = fields.Integer()
     batch_code = fields.String()
-    expiry_date = fields.Date(allow_none=True)
+    expiry_date = fields.String(allow_none=True)
     stock_qty = fields.Float()
     surplus_qty = fields.Float()
     total_qty = fields.Float()
-    updated_at = fields.DateTime(allow_none=True)
+    updated_at = fields.String(allow_none=True)
 
 
 class InventorySummaryQuerySchema(Schema):

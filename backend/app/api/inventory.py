@@ -251,11 +251,11 @@ class InventorySummary(MethodView):
                 'description': article.description,
                 'batch_id': batch.id,
                 'batch_code': batch.batch_code,
-                'expiry_date': batch.expiry_date,
+                'expiry_date': batch.expiry_date.isoformat() if batch.expiry_date else None,
                 'stock_qty': float(stock_qty),
                 'surplus_qty': float(surplus_qty),
-                'total_qty': float(stock_qty + surplus_qty),
-                'updated_at': updated_at
+                'total_qty': float(stock_qty) + float(surplus_qty),
+                'updated_at': updated_at.isoformat() if updated_at else None
             })
             
         return {'items': items, 'total': len(items)}

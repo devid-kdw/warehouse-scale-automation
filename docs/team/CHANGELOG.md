@@ -28,6 +28,18 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 **Ref**: TASK-0014, TASK-0015
 
+### 2026-02-07 - Inventory Hotfix (v2.1.1)
+**What**: Backend serialization fixes for Inventory Summary.
+
+**Why**: Fix `TypeError` when Marshmallow received Date objects for String fields, and ensure float precision for totals.
+
+**Changes**:
+- **API**: Explicit `float()` casting for `total_qty` calculation.
+- **API**: Manual `.isoformat()` serialization for dates (`expiry_date`, `updated_at`).
+- **Schema**: Updated `InventorySummaryItemSchema` to use `fields.String` for date fields.
+
+**Ref**: Hotfix
+
 ---
 
 ### 2026-02-07 - Core Refinement v2
