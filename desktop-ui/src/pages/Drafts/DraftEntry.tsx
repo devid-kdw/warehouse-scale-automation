@@ -1,7 +1,8 @@
-import { useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
     Container, Paper, Title, Select, TextInput, NumberInput,
-    Button, Group, Stack, Alert, ActionIcon, Tooltip, Text, Anchor
+    Button, Group, Stack, Alert, ActionIcon, Tooltip, Text, Anchor, Tabs,
+    SegmentedControl
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
@@ -16,12 +17,19 @@ import { useAppSettings } from '../../hooks/useAppSettings';
 import { useAuth } from '../../hooks/useAuth';
 import { getDrafts } from '../../api/services';
 import { Table, Badge } from '@mantine/core';
+import BulkDraftEntry from './BulkDraftEntry';
+import { isAdmin } from '../../api/auth';
 
 export default function DraftEntry() {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     useAppSettings();
     const { user } = useAuth();
+    const [qtyMode, setQtyMode] = useState<'manual' | 'scale'>(
+        (localStorage.getItem('draftEntry.qtyMode') as 'manual' | 'scale') || 'manual'
+    );
+    const barcodeBuffer = useRef('');
+    const lastKeyTime = useRef(0);
 
     // Fetch My Drafts
     const draftsQuery = useQuery({
@@ -47,12 +55,66 @@ export default function DraftEntry() {
         },
     });
 
-    // Initialize UUID on mount
+    // Initialize UUID on mount + Barcode Listener
     useEffect(() => {
         if (!form.values.client_event_id) {
             form.setFieldValue('client_event_id', uuidv4());
         }
+
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            const active = document.activeElement;
+            const isInput = active?.tagName === 'INPUT' || active?.tagName === 'TEXTAREA';
+
+            // Only capture if NOT in an input (safety requirement)
+            if (isInput) {
+                // Special case: if it's the article select's search input, we might still want to capture?
+                // But prompt says: "Do NOT override user if they are explicitly typing in a textarea or input."
+                // So we stick to safety.
+                return;
+            }
+
+            const now = Date.now();
+            if (now - lastKeyTime.current > 50) {
+                barcodeBuffer.current = '';
+            }
+            lastKeyTime.current = now;
+
+            if (e.key === 'Enter') {
+                if (barcodeBuffer.current.length >= 4) {
+                    processBarcode(barcodeBuffer.current);
+                }
+                barcodeBuffer.current = '';
+            } else if (e.key.length === 1) {
+                barcodeBuffer.current += e.key;
+            }
+        };
+
+        window.addEventListener('keydown', handleGlobalKeyDown);
+        return () => window.removeEventListener('keydown', handleGlobalKeyDown);
     }, []);
+
+    const processBarcode = async (code: string) => {
+        try {
+            // Find article by barcode/alias
+            notifications.show({ title: 'Barcode Scanned', message: `Searching for: ${code}`, color: 'blue', loading: true, id: 'barcode-scan' });
+            const article = await getArticles('true').then(res =>
+                res.items.find(a => a.article_no === code)
+            );
+
+            if (article) {
+                form.setFieldValue('article_id', article.id.toString());
+                notifications.update({ id: 'barcode-scan', title: 'Success', message: `Selected: ${article.article_no}`, color: 'green', loading: false });
+            } else {
+                notifications.update({ id: 'barcode-scan', title: 'Not Found', message: `Article ${code} unknown.`, color: 'orange', loading: false });
+            }
+        } catch (err) {
+            notifications.update({ id: 'barcode-scan', title: 'Error', message: 'Barcode resolution failed', color: 'red', loading: false });
+        }
+    };
+
+    useEffect(() => {
+        localStorage.setItem('draftEntry.qtyMode', qtyMode);
+    }, [qtyMode]);
 
     // Regenerate UUID helper
     const regenerateUuid = () => form.setFieldValue('client_event_id', uuidv4());
@@ -124,98 +186,217 @@ export default function DraftEntry() {
 
     return (
         <Container size="sm" py="xl">
-            <Paper shadow="xs" p="xl" withBorder>
-                <Title order={2} mb="md">Manual Weigh-In Entry</Title>
-                <Text c="dimmed" mb="xl">Create a new weight draft. Entries will be pending approval.</Text>
+            <Title order={2} mb="md">Manual Weigh-In Entry</Title>
+            <Text c="dimmed" mb="xl">Create new weight drafts. Entries will be pending approval.</Text>
 
-                <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
-                    <Stack>
-                        <TextInput
-                            label="Location ID"
-                            description="Default is 1 (Main Scale). Change only if needed."
-                            {...form.getInputProps('location_id')}
-                        />
+            {isAdmin() ? (
+                <Tabs defaultValue="single" mb="xl">
+                    <Tabs.List mb="md">
+                        <Tabs.Tab value="single">Single Entry</Tabs.Tab>
+                        <Tabs.Tab value="bulk">Bulk Entry (Admin)</Tabs.Tab>
+                    </Tabs.List>
 
-                        <Select
-                            label="Article"
-                            placeholder="Select article"
-                            data={articlesQuery.data || []}
-                            searchable
-                            nothingFoundMessage="No articles found"
-                            disabled={articlesQuery.isLoading}
-                            {...form.getInputProps('article_id')}
-                            onChange={(val) => {
-                                form.setFieldValue('article_id', val || '');
-                                form.setFieldValue('batch_id', ''); // Reset batch
-                            }}
-                            required
-                        />
+                    <Tabs.Panel value="single">
+                        <Paper shadow="xs" p="xl" withBorder>
+                            <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
+                                <Stack>
+                                    <Group justify="space-between">
+                                        <TextInput
+                                            label="Location ID"
+                                            description="Default is 1 (Main Scale)."
+                                            {...form.getInputProps('location_id')}
+                                            style={{ flex: 1 }}
+                                        />
+                                        <Stack gap={2}>
+                                            <Text size="sm" fw={500}>Entry Mode</Text>
+                                            <SegmentedControl
+                                                value={qtyMode}
+                                                onChange={(val: any) => setQtyMode(val)}
+                                                data={[
+                                                    { label: 'Manual', value: 'manual' },
+                                                    { label: 'Scale', value: 'scale' },
+                                                ]}
+                                            />
+                                        </Stack>
+                                    </Group>
 
-                        <Select
-                            label="Batch"
-                            placeholder={!form.values.article_id ? "Select an article first" : "Select batch"}
-                            data={batchOptions}
-                            searchable
-                            disabled={!form.values.article_id || batchesQuery.isLoading}
-                            {...form.getInputProps('batch_id')}
-                            required
-                            error={isBatchExpired ? 'Selected batch is EXPIRED!' : null}
-                        />
+                                    <Select
+                                        label="Article"
+                                        placeholder="Select article"
+                                        data={articlesQuery.data || []}
+                                        searchable
+                                        nothingFoundMessage="No articles found"
+                                        disabled={articlesQuery.isLoading}
+                                        {...form.getInputProps('article_id')}
+                                        onChange={(val) => {
+                                            form.setFieldValue('article_id', val || '');
+                                            form.setFieldValue('batch_id', ''); // Reset batch
+                                        }}
+                                        required
+                                    />
 
-                        {isBatchExpired && (
-                            <Alert icon={<IconAlertTriangle size={16} />} title="Warning: Expired Batch" color="red" variant="filled">
-                                This batch expired on {dayjs(selectedBatch.expiry_date).format('DD.MM.YYYY')}.
-                                You can still proceed, but this will be flagged.
-                            </Alert>
-                        )}
+                                    <Select
+                                        label="Batch"
+                                        placeholder={!form.values.article_id ? "Select an article first" : "Select batch"}
+                                        data={batchOptions}
+                                        searchable
+                                        disabled={!form.values.article_id || batchesQuery.isLoading}
+                                        {...form.getInputProps('batch_id')}
+                                        required
+                                        error={isBatchExpired ? 'Selected batch is EXPIRED!' : null}
+                                    />
 
-                        <NumberInput
-                            label="Quantity (kg)"
-                            placeholder="0.00"
-                            decimalScale={2}
-                            fixedDecimalScale
-                            min={0}
-                            step={0.01}
-                            {...form.getInputProps('quantity_kg')}
-                            required
-                        />
+                                    {isBatchExpired && (
+                                        <Alert icon={<IconAlertTriangle size={16} />} title="Warning: Expired Batch" color="red" variant="filled">
+                                            This batch expired on {dayjs(selectedBatch.expiry_date).format('DD.MM.YYYY')}.
+                                            You can still proceed, but this will be flagged.
+                                        </Alert>
+                                    )}
 
-                        <Group align="flex-end" gap="xs">
+                                    <NumberInput
+                                        label="Quantity (kg)"
+                                        placeholder={qtyMode === 'scale' ? "Waiting for scale..." : "0.00"}
+                                        decimalScale={2}
+                                        fixedDecimalScale
+                                        min={0}
+                                        step={0.01}
+                                        {...form.getInputProps('quantity_kg')}
+                                        required
+                                        readOnly={qtyMode === 'scale'}
+                                        variant={qtyMode === 'scale' ? 'filled' : 'default'}
+                                    />
+
+                                    <Group align="flex-end" gap="xs">
+                                        <TextInput
+                                            label="Client Event ID"
+                                            style={{ flex: 1 }}
+                                            readOnly
+                                            {...form.getInputProps('client_event_id')}
+                                        />
+                                        <Tooltip label="Generate new UUID">
+                                            <ActionIcon variant="light" size="lg" mb={2} onClick={regenerateUuid}>
+                                                <IconRefresh size={18} />
+                                            </ActionIcon>
+                                        </Tooltip>
+                                    </Group>
+
+                                    {mutation.isError && (
+                                        <Alert icon={<IconX size={16} />} title="Error" color="red">
+                                            {extractErrorMessage(mutation.error)}
+                                        </Alert>
+                                    )}
+
+                                    {mutation.isSuccess && (
+                                        <Alert icon={<IconCheck size={16} />} title="Success" color="green" withCloseButton onClose={mutation.reset}>
+                                            Draft created! You can fill the form again for another entry, or <Anchor onClick={() => navigate('/drafts')} fw={700}>Go to Approvals</Anchor>.
+                                        </Alert>
+                                    )}
+
+                                    <Group mt="md" grow>
+                                        <Button type="submit" loading={mutation.isPending}>
+                                            Submit Entry
+                                        </Button>
+                                    </Group>
+                                </Stack>
+                            </form>
+                        </Paper>
+                    </Tabs.Panel>
+
+                    <Tabs.Panel value="bulk">
+                        <Paper shadow="xs" p="xl" withBorder>
+                            <BulkDraftEntry />
+                        </Paper>
+                    </Tabs.Panel>
+                </Tabs>
+            ) : (
+                <Paper shadow="xs" p="xl" withBorder>
+                    <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
+                        <Stack>
                             <TextInput
-                                label="Client Event ID"
-                                style={{ flex: 1 }}
-                                readOnly
-                                {...form.getInputProps('client_event_id')}
+                                label="Location ID"
+                                description="Default is 1 (Main Scale). Change only if needed."
+                                {...form.getInputProps('location_id')}
                             />
-                            <Tooltip label="Generate new UUID">
-                                <ActionIcon variant="light" size="lg" mb={2} onClick={regenerateUuid}>
-                                    <IconRefresh size={18} />
-                                </ActionIcon>
-                            </Tooltip>
-                        </Group>
 
-                        {mutation.isError && (
-                            <Alert icon={<IconX size={16} />} title="Error" color="red">
-                                {extractErrorMessage(mutation.error)}
-                            </Alert>
-                        )}
+                            <Select
+                                label="Article"
+                                placeholder="Select article"
+                                data={articlesQuery.data || []}
+                                searchable
+                                nothingFoundMessage="No articles found"
+                                disabled={articlesQuery.isLoading}
+                                {...form.getInputProps('article_id')}
+                                onChange={(val) => {
+                                    form.setFieldValue('article_id', val || '');
+                                    form.setFieldValue('batch_id', ''); // Reset batch
+                                }}
+                                required
+                            />
 
-                        {/* Success/Navigation hint */}
-                        {mutation.isSuccess && (
-                            <Alert icon={<IconCheck size={16} />} title="Success" color="green" withCloseButton onClose={mutation.reset}>
-                                Draft created! You can fill the form again for another entry, or <Anchor onClick={() => navigate('/drafts')} fw={700}>Go to Approvals</Anchor>.
-                            </Alert>
-                        )}
+                            <Select
+                                label="Batch"
+                                placeholder={!form.values.article_id ? "Select an article first" : "Select batch"}
+                                data={batchOptions}
+                                searchable
+                                disabled={!form.values.article_id || batchesQuery.isLoading}
+                                {...form.getInputProps('batch_id')}
+                                required
+                                error={isBatchExpired ? 'Selected batch is EXPIRED!' : null}
+                            />
 
-                        <Group mt="md" grow>
-                            <Button type="submit" loading={mutation.isPending}>
-                                Submit Entry
-                            </Button>
-                        </Group>
-                    </Stack>
-                </form>
-            </Paper>
+                            {isBatchExpired && (
+                                <Alert icon={<IconAlertTriangle size={16} />} title="Warning: Expired Batch" color="red" variant="filled">
+                                    This batch expired on {dayjs(selectedBatch.expiry_date).format('DD.MM.YYYY')}.
+                                    You can still proceed, but this will be flagged.
+                                </Alert>
+                            )}
 
+                            <NumberInput
+                                label="Quantity (kg)"
+                                placeholder="0.00"
+                                decimalScale={2}
+                                fixedDecimalScale
+                                min={0}
+                                step={0.01}
+                                {...form.getInputProps('quantity_kg')}
+                                required
+                            />
+
+                            <Group align="flex-end" gap="xs">
+                                <TextInput
+                                    label="Client Event ID"
+                                    style={{ flex: 1 }}
+                                    readOnly
+                                    {...form.getInputProps('client_event_id')}
+                                />
+                                <Tooltip label="Generate new UUID">
+                                    <ActionIcon variant="light" size="lg" mb={2} onClick={regenerateUuid}>
+                                        <IconRefresh size={18} />
+                                    </ActionIcon>
+                                </Tooltip>
+                            </Group>
+
+                            {mutation.isError && (
+                                <Alert icon={<IconX size={16} />} title="Error" color="red">
+                                    {extractErrorMessage(mutation.error)}
+                                </Alert>
+                            )}
+
+                            {mutation.isSuccess && (
+                                <Alert icon={<IconCheck size={16} />} title="Success" color="green" withCloseButton onClose={mutation.reset}>
+                                    Draft created! You can fill the form again for another entry, or <Anchor onClick={() => navigate('/drafts')} fw={700}>Go to Approvals</Anchor>.
+                                </Alert>
+                            )}
+
+                            <Group mt="md" grow>
+                                <Button type="submit" loading={mutation.isPending}>
+                                    Submit Entry
+                                </Button>
+                            </Group>
+                        </Stack>
+                    </form>
+                </Paper>
+            )}
 
             <Paper shadow="xs" p="xl" mt="xl" withBorder>
                 <Title order={3} mb="md">My Recent Drafts</Title>

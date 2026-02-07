@@ -4,7 +4,9 @@ import {
     Article, Batch,
     WeighInDraft, CreateDraftPayload, ApprovalPayload, ApprovalResponse,
     CreateArticlePayload, CreateBatchPayload, StockReceivePayload, StockReceiveResponse,
-    InventoryResponse, InventoryCountPayload, TransactionsResponse, AliasesResponse
+    InventoryResponse, InventoryCountPayload, TransactionsResponse, AliasesResponse,
+    DraftGroup, DraftGroupSummary, CreateDraftGroupPayload,
+    ReceiptHistoryResponse
 } from './types';
 import { AxiosError } from 'axios';
 
@@ -85,6 +87,39 @@ export const rejectDraft = async (id: number, data: ApprovalPayload) => {
     return response.data;
 };
 
+// --- Draft Groups ---
+export const getDraftGroups = async (status?: string) => {
+    const response = await apiClient.get<{ items: DraftGroupSummary[], total: number }>(API_ENDPOINTS.DRAFT_GROUPS.LIST, {
+        params: { status }
+    });
+    return response.data;
+};
+
+export const getDraftGroup = async (id: number) => {
+    const response = await apiClient.get<DraftGroup>(API_ENDPOINTS.DRAFT_GROUPS.GET(id));
+    return response.data;
+};
+
+export const createDraftGroup = async (data: CreateDraftGroupPayload) => {
+    const response = await apiClient.post<DraftGroup>(API_ENDPOINTS.DRAFT_GROUPS.CREATE, data);
+    return response.data;
+};
+
+export const renameDraftGroup = async (id: number, name: string) => {
+    const response = await apiClient.patch<DraftGroup>(API_ENDPOINTS.DRAFT_GROUPS.RENAME(id), { name });
+    return response.data;
+};
+
+export const approveDraftGroup = async (id: number) => {
+    const response = await apiClient.post<{ message: string }>(API_ENDPOINTS.DRAFT_GROUPS.APPROVE(id));
+    return response.data;
+};
+
+export const rejectDraftGroup = async (id: number) => {
+    const response = await apiClient.post<{ message: string }>(API_ENDPOINTS.DRAFT_GROUPS.REJECT(id));
+    return response.data;
+};
+
 // --- Inventory ---
 export const getInventorySummary = async (filters?: { article_id?: number, batch_id?: number, location_id?: number }) => {
     const response = await apiClient.get<InventoryResponse>(API_ENDPOINTS.INVENTORY.SUMMARY, {
@@ -100,6 +135,11 @@ export const performInventoryCount = async (data: InventoryCountPayload) => {
 
 export const receiveStock = async (data: StockReceivePayload) => {
     const response = await apiClient.post<StockReceiveResponse>(API_ENDPOINTS.INVENTORY.RECEIVE, data);
+    return response.data;
+};
+
+export const getReceiptHistory = async () => {
+    const response = await apiClient.get<ReceiptHistoryResponse>(API_ENDPOINTS.INVENTORY.RECEIPTS);
     return response.data;
 };
 

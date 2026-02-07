@@ -33,6 +33,7 @@ export const API_ENDPOINTS = {
         COUNT: '/api/inventory/count',
         ADJUST: '/api/inventory/adjust',
         RECEIVE: '/api/inventory/receive',
+        RECEIPTS: '/api/inventory/receipts',
     },
 
     TRANSACTIONS: {
@@ -43,5 +44,14 @@ export const API_ENDPOINTS = {
         LIST: (articleId: number) => `/api/articles/${articleId}/aliases`,
         CREATE: (articleId: number) => `/api/articles/${articleId}/aliases`,
         DELETE: (articleId: number, aliasId: number) => `/api/articles/${articleId}/aliases/${aliasId}`,
+    },
+
+    DRAFT_GROUPS: {
+        LIST: '/api/draft-groups',
+        CREATE: '/api/draft-groups',
+        GET: (id: number) => `/api/draft-groups/${id}`,
+        RENAME: (id: number) => `/api/draft-groups/${id}`,
+        APPROVE: (id: number) => `/api/draft-groups/${id}/approve`,
+        REJECT: (id: number) => `/api/draft-groups/${id}/reject`,
     }
 } as const;

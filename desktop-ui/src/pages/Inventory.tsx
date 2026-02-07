@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
     Container, Title, Paper, Table, Group, Button, TextInput,
     Badge, LoadingOverlay, Modal, NumberInput, Stack, Text,
-    Menu, ActionIcon, Tooltip
+    Menu, ActionIcon, Tooltip, Tabs, Alert
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
@@ -10,7 +10,8 @@ import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     IconCheck,
-    IconSearch, IconClipboardCheck, IconX, IconDotsVertical, IconPackageImport, IconAlertTriangle
+    IconSearch, IconClipboardCheck, IconX, IconDotsVertical, IconPackageImport, IconAlertTriangle,
+    IconRefresh
 } from '@tabler/icons-react';
 import { getInventorySummary, performInventoryCount, extractErrorMessage } from '../api/services';
 import { InventoryItem, InventoryCountPayload } from '../api/types';
@@ -66,8 +67,6 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
         }
     });
 
-    // Reset logic moved to useEffect
-
     return (
         <Modal opened={opened} onClose={onClose} title="Perform Inventory Count" centered>
             <form onSubmit={form.onSubmit((values) => countMutation.mutate(values))}>
@@ -105,24 +104,29 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
 }
 
 export default function Inventory() {
+    const navigate = useNavigate();
     const [search, setSearch] = useState('');
+    const [activeTab, setActiveTab] = useState<string | null>('paint');
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
     const [opened, { open, close }] = useDisclosure(false);
-    const navigate = useNavigate();
 
     // Fetch Inventory
-    const { data, isLoading } = useQuery({
+    const { data, isLoading, isError, error, refetch } = useQuery({
         queryKey: ['inventory'],
         queryFn: () => getInventorySummary(),
     });
 
     // Filter logic
-    const filteredItems = data?.items.filter(item =>
-        item.article_no.toLowerCase().includes(search.toLowerCase()) ||
-        (item.description || '').toLowerCase().includes(search.toLowerCase()) ||
-        item.batch_code.toLowerCase().includes(search.toLowerCase()) ||
-        item.location_code.toLowerCase().includes(search.toLowerCase())
-    ) || [];
+    const filteredItems = data?.items.filter(item => {
+        const matchesSearch = item.article_no.toLowerCase().includes(search.toLowerCase()) ||
+            (item.description || '').toLowerCase().includes(search.toLowerCase()) ||
+            item.batch_code.toLowerCase().includes(search.toLowerCase()) ||
+            item.location_code.toLowerCase().includes(search.toLowerCase());
+
+        const matchesCategory = activeTab === 'paint' ? item.is_paint : !item.is_paint;
+
+        return matchesSearch && matchesCategory;
+    }) || [];
 
     const openCountModal = (item: InventoryItem) => {
         setSelectedItem(item);
@@ -148,17 +152,24 @@ export default function Inventory() {
                     </Group>
                     <Text size="xs" c="dimmed">{item.description}</Text>
                 </Table.Td>
-                <Table.Td>{item.batch_code}</Table.Td>
+                <Table.Td>
+                    <Group gap="xs">
+                        <Text size="sm" fw={500}>{item.batch_code}</Text>
+                        {item.batch_code === 'NA' && <Badge size="xs" variant="outline" color="gray">System</Badge>}
+                    </Group>
+                </Table.Td>
                 <Table.Td>
                     {item.expiry_date ? (
-                        <Text c={isExpired ? 'red' : (isExpiringSoon ? 'orange' : undefined)} size="sm">
-                            {dayjs(item.expiry_date).format('DD.MM.YYYY')}
-                        </Text>
+                        <Tooltip label={isExpired ? "Expired" : (isExpiringSoon ? "Expiring Soon" : "Valid Batch")}>
+                            <Text c={isExpired ? 'red' : (isExpiringSoon ? 'orange' : undefined)} size="sm" style={{ cursor: 'help' }}>
+                                {dayjs(item.expiry_date).format('DD.MM.YYYY')}
+                            </Text>
+                        </Tooltip>
                     ) : '-'}
                 </Table.Td>
                 <Table.Td fw={700} align="right">{item.total_qty.toFixed(2)}</Table.Td>
                 <Table.Td align="right">
-                    <Text c="dimmed" size="sm">Pending...</Text>
+                    <Text c="dimmed" size="sm">{item.updated_at ? dayjs(item.updated_at).fromNow() : '-'}</Text>
                 </Table.Td>
                 <Table.Td>
                     <Menu shadow="md" width={200} position="bottom-end">
@@ -204,17 +215,36 @@ export default function Inventory() {
                 </Button>
             </Group>
 
+            {isError && (
+                <Alert icon={<IconAlertTriangle size={16} />} title="Error loading inventory" color="red" mb="md">
+                    <Stack gap="xs">
+                        <Text size="sm">{extractErrorMessage(error)}</Text>
+                        <Button variant="outline" size="xs" color="red" leftSection={<IconRefresh size={14} />} onClick={() => refetch()} style={{ width: 'fit-content' }}>
+                            Retry
+                        </Button>
+                    </Stack>
+                </Alert>
+            )}
+
             <Paper shadow="xs" p="md" withBorder>
-                <TextInput
-                    placeholder="Search by article, batch, or location..."
-                    leftSection={<IconSearch size={16} />}
-                    mb="md"
-                    value={search}
-                    onChange={(e) => setSearch(e.currentTarget.value)}
-                />
+                <Group mb="md" justify="space-between">
+                    <TextInput
+                        placeholder="Search by article, batch, or location..."
+                        leftSection={<IconSearch size={16} />}
+                        value={search}
+                        onChange={(e) => setSearch(e.currentTarget.value)}
+                        style={{ flex: 1 }}
+                    />
+                    <Tabs value={activeTab} onChange={setActiveTab} variant="pills">
+                        <Tabs.List>
+                            <Tabs.Tab value="paint">Paint Articles</Tabs.Tab>
+                            <Tabs.Tab value="consumable">Consumables</Tabs.Tab>
+                        </Tabs.List>
+                    </Tabs>
+                </Group>
 
                 <div style={{ position: 'relative', minHeight: 200 }}>
-                    <LoadingOverlay visible={isLoading} />
+                    <LoadingOverlay visible={isLoading} overlayProps={{ radius: "sm", blur: 2 }} />
 
                     {filteredItems.length === 0 && !isLoading ? (
                         <EmptyState message="No inventory items found" />
@@ -226,7 +256,7 @@ export default function Inventory() {
                                     <Table.Th>Batch</Table.Th>
                                     <Table.Th>Expiry</Table.Th>
                                     <Table.Th style={{ textAlign: 'right' }}>Total Qty (KG)</Table.Th>
-                                    <Table.Th style={{ textAlign: 'right' }}>Last Used</Table.Th>
+                                    <Table.Th style={{ textAlign: 'right' }}>Last Updated</Table.Th>
                                     <Table.Th w={50}></Table.Th>
                                 </Table.Tr>
                             </Table.Thead>

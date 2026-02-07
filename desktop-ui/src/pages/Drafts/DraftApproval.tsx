@@ -1,121 +1,68 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import {
     Container, Paper, Title, Table, Button, Group, Text, Alert,
-    Modal, Textarea, Badge, LoadingOverlay, Stack, SegmentedControl, Code
+    Badge, LoadingOverlay, SegmentedControl, ActionIcon
 } from '@mantine/core';
-import { useDisclosure } from '@mantine/hooks';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { notifications } from '@mantine/notifications';
-import { IconCheck, IconX, IconAlertCircle } from '@tabler/icons-react';
-import { getDrafts, approveDraft, rejectDraft, extractErrorMessage, getArticles } from '../../api/services';
-import { WeighInDraft, Article } from '../../api/types';
+import { useQuery } from '@tanstack/react-query';
+import { getDraftGroups, extractErrorMessage } from '../../api/services';
+import { IconAlertCircle, IconEye, IconEdit } from '@tabler/icons-react';
 import { EmptyState } from '../../components/common/EmptyState';
+import DraftGroupDetail from '../Approvals/DraftGroupDetail';
+import dayjs from 'dayjs';
 
 export default function DraftApproval() {
-    const queryClient = useQueryClient();
-    const [selectedDraft, setSelectedDraft] = useState<WeighInDraft | null>(null);
-    const [approvalNote, setApprovalNote] = useState('');
-    const [opened, { open, close }] = useDisclosure(false);
-    const [actionType, setActionType] = useState<'approve' | 'reject'>('approve');
     const [statusFilter, setStatusFilter] = useState<string>('DRAFT');
+    const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
 
-    // Fetch Articles for mapping
-    const articlesQuery = useQuery({
-        queryKey: ['articles', 'all'],
-        queryFn: () => getArticles('all'),
-        staleTime: 1000 * 60 * 5, // 5 min
-    });
-
-    const articleMap = useMemo(() => {
-        const map = new Map<number, Article>();
-        articlesQuery.data?.items.forEach(a => map.set(a.id, a));
-        return map;
-    }, [articlesQuery.data]);
-
-    // Fetch Drafts
+    // Fetch Draft Groups instead of individual drafts
     const { data, isLoading, isError, error } = useQuery({
-        queryKey: ['drafts', statusFilter],
-        queryFn: () => getDrafts(statusFilter),
+        queryKey: ['draftGroups', statusFilter],
+        queryFn: () => getDraftGroups(statusFilter),
     });
 
-    // Approve/Reject Mutation
-    const mutation = useMutation({
-        mutationFn: async () => {
-            if (!selectedDraft) return;
-            const payload = { note: approvalNote };
-
-            if (actionType === 'approve') {
-                return approveDraft(selectedDraft.id, payload);
-            } else {
-                return rejectDraft(selectedDraft.id, payload);
-            }
-        },
-        onSuccess: () => {
-            notifications.show({
-                title: actionType === 'approve' ? 'Approved' : 'Rejected',
-                message: `Draft #${selectedDraft?.id} processed successfully.`,
-                color: 'green',
-                icon: <IconCheck size={16} />,
-            });
-            queryClient.invalidateQueries({ queryKey: ['drafts'] });
-            close();
-            setApprovalNote('');
-            setSelectedDraft(null);
-        },
-        onError: (err: any) => {
-            // If 409 conflict (insufficient stock), the error message should be detailed enough via extractErrorMessage
-            notifications.show({
-                title: 'Action Failed',
-                message: extractErrorMessage(err),
-                color: 'red',
-                icon: <IconX size={16} />,
-                autoClose: 10000, // Keep longer for errors
-            });
-        }
-    });
-
-    const handleAction = (draft: WeighInDraft, type: 'approve' | 'reject') => {
-        setSelectedDraft(draft);
-        setActionType(type);
-        setApprovalNote('');
-        open();
-    };
-
-    const rows = data?.items.map((draft) => {
-        const article = articleMap.get(draft.article_id);
-        const articleDisplay = article ? `${article.article_no} - ${article.description}` : `ID: ${draft.article_id}`;
+    const rows = data?.items.map((group) => {
+        const sourceLabel = group.source === 'ui_admin' ? 'Admin Draft' : 'Auto Draft';
+        const sourceColor = group.source === 'ui_admin' ? 'blue' : 'gray';
 
         return (
-            <Table.Tr key={draft.id}>
-                <Table.Td>{draft.id}</Table.Td>
-                <Table.Td>{new Date(draft.created_at).toLocaleString()}</Table.Td>
+            <Table.Tr key={group.id} style={{ cursor: 'pointer' }} onClick={() => setSelectedGroupId(group.id)}>
+                <Table.Td>{group.id}</Table.Td>
+                <Table.Td>{dayjs(group.created_at).format('DD.MM.YYYY HH:mm')}</Table.Td>
                 <Table.Td>
-                    <Text size="sm" fw={500}>{articleDisplay}</Text>
-                    <Text size="xs" c="dimmed">Batch ID: {draft.batch_id}</Text>
+                    <Group gap="xs">
+                        <Text size="sm" fw={500}>{group.name || '(unnamed group)'}</Text>
+                        <ActionIcon
+                            size="xs"
+                            variant="subtle"
+                            color="blue"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedGroupId(group.id);
+                            }}
+                        >
+                            <IconEdit size={14} />
+                        </ActionIcon>
+                    </Group>
+                    <Text size="xs" c="dimmed">{group.line_count} items</Text>
                 </Table.Td>
-                <Table.Td fw={700}>{draft.quantity_kg} kg</Table.Td>
+                <Table.Td fw={700}>{group.total_quantity_kg} kg</Table.Td>
                 <Table.Td>
                     <Badge
-                        color={draft.status === 'DRAFT' ? 'blue' : (draft.status === 'APPROVED' ? 'green' : 'red')}
+                        color={group.status === 'DRAFT' ? 'blue' : (group.status === 'APPROVED' ? 'green' : 'red')}
                         variant="light"
                     >
-                        {draft.status}
+                        {group.status}
                     </Badge>
                 </Table.Td>
                 <Table.Td>
-                    <Code>{draft.source || 'manual'}</Code>
+                    <Badge color={sourceColor} variant="dot">
+                        {sourceLabel}
+                    </Badge>
                 </Table.Td>
                 <Table.Td>
-                    {draft.status === 'DRAFT' && (
-                        <Group gap="xs">
-                            <Button size="compact-xs" color="green" variant="light" onClick={() => handleAction(draft, 'approve')}>
-                                Approve
-                            </Button>
-                            <Button size="compact-xs" color="red" variant="subtle" onClick={() => handleAction(draft, 'reject')}>
-                                Reject
-                            </Button>
-                        </Group>
-                    )}
+                    <Button size="compact-xs" variant="subtle" leftSection={<IconEye size={14} />}>
+                        View Details
+                    </Button>
                 </Table.Td>
             </Table.Tr>
         );
@@ -137,24 +84,24 @@ export default function DraftApproval() {
             </Group>
 
             {isError && (
-                <Alert icon={<IconAlertCircle size={16} />} title="Error loading drafts" color="red" mb="md">
+                <Alert icon={<IconAlertCircle size={16} />} title="Error loading draft groups" color="red" mb="md">
                     {extractErrorMessage(error)}
                 </Alert>
             )}
 
             <Paper shadow="xs" p="md" withBorder>
-                <LoadingOverlay visible={isLoading || articlesQuery.isLoading} overlayProps={{ radius: "sm", blur: 2 }} />
+                <LoadingOverlay visible={isLoading} overlayProps={{ radius: "sm", blur: 2 }} />
 
-                {data?.items.length === 0 ? (
-                    <EmptyState message={`No ${statusFilter.toLowerCase()} drafts found.`} />
+                {(data?.items.length === 0 || !data) ? (
+                    <EmptyState message={`No ${statusFilter.toLowerCase()} draft groups found.`} />
                 ) : (
-                    <Table stickyHeader striped highlightOnHover>
+                    <Table stickyHeader striped highlightOnHover withTableBorder>
                         <Table.Thead>
                             <Table.Tr>
                                 <Table.Th>ID</Table.Th>
-                                <Table.Th>Timestamp</Table.Th>
-                                <Table.Th>Article / Batch</Table.Th>
-                                <Table.Th>Quantity</Table.Th>
+                                <Table.Th>Created At</Table.Th>
+                                <Table.Th>Name / Items</Table.Th>
+                                <Table.Th>Total Qty</Table.Th>
                                 <Table.Th>Status</Table.Th>
                                 <Table.Th>Source</Table.Th>
                                 <Table.Th>Actions</Table.Th>
@@ -165,55 +112,10 @@ export default function DraftApproval() {
                 )}
             </Paper>
 
-            <Modal opened={opened} onClose={close} title={`${actionType === 'approve' ? 'Approve' : 'Reject'} Draft #${selectedDraft?.id}`} centered>
-                <Stack>
-                    <Text size="sm">
-                        Are you sure you want to <strong>{actionType}</strong> this draft?
-                    </Text>
-
-                    {selectedDraft && (
-                        <Paper withBorder p="xs" bg="gray.1">
-                            <Group justify="space-between">
-                                <Text size="xs" fw={700}>Quantity:</Text>
-                                <Text size="xs">{selectedDraft.quantity_kg} kg</Text>
-                            </Group>
-                            <Group justify="space-between">
-                                <Text size="xs" fw={700}>Article ID:</Text>
-                                <Text size="xs">{selectedDraft.article_id}</Text>
-                            </Group>
-                            <Group justify="space-between">
-                                <Text size="xs" fw={700}>Batch ID:</Text>
-                                <Text size="xs">{selectedDraft.batch_id}</Text>
-                            </Group>
-                        </Paper>
-                    )}
-
-                    <Textarea
-                        label="Note"
-                        placeholder="Optional reason or comment"
-                        value={approvalNote}
-                        onChange={(e) => setApprovalNote(e.target.value)}
-                        minRows={3}
-                    />
-
-                    {mutation.isError && (
-                        <Alert color="red" title="Error" icon={<IconAlertCircle size={16} />}>
-                            {extractErrorMessage(mutation.error)}
-                        </Alert>
-                    )}
-
-                    <Group justify="flex-end" mt="md">
-                        <Button variant="default" onClick={close}>Cancel</Button>
-                        <Button
-                            color={actionType === 'approve' ? 'green' : 'red'}
-                            loading={mutation.isPending}
-                            onClick={() => mutation.mutate()}
-                        >
-                            Confirm {actionType === 'approve' ? 'Approval' : 'Rejection'}
-                        </Button>
-                    </Group>
-                </Stack>
-            </Modal>
+            <DraftGroupDetail
+                groupId={selectedGroupId}
+                onClose={() => setSelectedGroupId(null)}
+            />
         </Container>
     );
 }

@@ -22,13 +22,19 @@ export default function Receiving() {
             batch_code: '',
             quantity_kg: 0,
             expiry_date: null as Date | null,
+            order_number: '',
             note: '',
             // Hidden fields
             location_id: 1 // Default to 1
         },
         validate: {
             article_id: (val) => !val ? 'Article is required' : null,
-            batch_code: (val) => {
+            order_number: (val) => !val ? 'Order number is required' : (val.length > 50 ? 'Max 50 characters' : null),
+            batch_code: (val, values) => {
+                const article = articlesQuery.data?.find(a => a.value === values.article_id);
+                const isConsumable = article && article.is_paint === false;
+                if (isConsumable) return null;
+
                 if (!val) return 'Batch code is required';
                 if (!/^\d{4,5}$|^\d{9,12}$/.test(val)) {
                     return 'Invalid format. Must be 4-5 (Mankiewicz) or 9-12 (Akzo) digits.';
@@ -36,7 +42,13 @@ export default function Receiving() {
                 return null;
             },
             quantity_kg: (val) => val <= 0 ? 'Quantity must be greater than 0' : null,
-            expiry_date: (val) => !val ? 'Expiry date is required' : null,
+            expiry_date: (val, values) => {
+                const article = articlesQuery.data?.find(a => a.value === values.article_id);
+                const isConsumable = article && article.is_paint === false;
+                if (isConsumable) return null;
+
+                return !val ? 'Expiry date is required' : null;
+            },
         },
     });
 
@@ -47,7 +59,8 @@ export default function Receiving() {
         select: (data) => data.items.map(a => ({
             value: a.id.toString(),
             label: `${a.article_no} - ${a.description}`,
-            article_no: a.article_no
+            article_no: a.article_no,
+            is_paint: a.is_paint
         })),
     });
 
@@ -65,14 +78,20 @@ export default function Receiving() {
     const existingBatch = batchesQuery.data?.items.find(b => b.batch_code === form.values.batch_code);
     const isNewBatch = form.values.batch_code.length >= 4 && !existingBatch;
 
+    const selectedArticle = articlesQuery.data?.find(a => a.value === form.values.article_id);
+    const isConsumable = selectedArticle && selectedArticle.is_paint === false;
+
     // Receive Mutation
     const mutation = useMutation({
         mutationFn: (values: typeof form.values) => {
             return receiveStock({
                 article_id: parseInt(values.article_id),
-                batch_code: values.batch_code,
+                batch_code: isConsumable ? "NA" : values.batch_code,
                 quantity_kg: values.quantity_kg,
-                expiry_date: values.expiry_date ? dayjs(values.expiry_date).format('YYYY-MM-DD') : '',
+                expiry_date: isConsumable
+                    ? "2099-12-31"
+                    : (values.expiry_date ? dayjs(values.expiry_date).format('YYYY-MM-DD') : ''),
+                order_number: values.order_number,
                 note: values.note,
                 location_id: values.location_id
             });
@@ -95,6 +114,7 @@ export default function Receiving() {
             form.setFieldValue('batch_code', '');
             form.setFieldValue('quantity_kg', 0);
             form.setFieldValue('expiry_date', null);
+            form.setFieldValue('order_number', '');
             form.setFieldValue('note', '');
             // article_id remains set
         },
@@ -134,37 +154,53 @@ export default function Receiving() {
                             nothingFoundMessage="No articles found"
                             disabled={articlesQuery.isLoading}
                             {...form.getInputProps('article_id')}
+                            onChange={(val) => {
+                                form.setFieldValue('article_id', val || '');
+                                // Reset batch/expiry if article changes
+                                form.setFieldValue('batch_code', '');
+                                form.setFieldValue('expiry_date', null);
+                            }}
                             required
                         />
 
                         <TextInput
-                            label="Batch Code"
-                            placeholder="e.g. 12345 or 1234567890"
-                            description="4-5 digits (Mankiewicz) or 9-12 digits (Akzo)"
-                            {...form.getInputProps('batch_code')}
+                            label="Order Number"
+                            placeholder="Invoice or PO number"
+                            {...form.getInputProps('order_number')}
                             required
-                            rightSection={existingBatch ? <IconCheck color="green" size={16} /> : (isNewBatch ? <IconInfoCircle color="blue" size={16} /> : null)}
                         />
-                        {existingBatch && (
-                            <Text size="xs" c="green" mt={-10} mb="sm">
-                                Existing Batch found. Expiry: {existingBatch.expiry_date}
-                            </Text>
-                        )}
-                        {isNewBatch && !batchesQuery.isLoading && (
-                            <Text size="xs" c="blue" mt={-10} mb="sm">
-                                New Batch will be created.
-                            </Text>
-                        )}
 
-                        <DateInput
-                            label="Expiry Date"
-                            placeholder="Select date"
-                            valueFormat="DD.MM.YYYY"
-                            minDate={new Date()} // Optional: prevent receiving already expired? Backend allows it but warns.
-                            // User requirement says it's required.
-                            {...form.getInputProps('expiry_date')}
-                            required
-                        />
+                        {!isConsumable && (
+                            <>
+                                <TextInput
+                                    label="Batch Code"
+                                    placeholder="e.g. 12345 or 1234567890"
+                                    description="4-5 digits (Mankiewicz) or 9-12 digits (Akzo)"
+                                    {...form.getInputProps('batch_code')}
+                                    required
+                                    rightSection={existingBatch ? <IconCheck color="green" size={16} /> : (isNewBatch ? <IconInfoCircle color="blue" size={16} /> : null)}
+                                />
+                                {existingBatch && (
+                                    <Text size="xs" c="green" mt={-10} mb="sm">
+                                        Existing Batch found. Expiry: {existingBatch.expiry_date}
+                                    </Text>
+                                )}
+                                {isNewBatch && !batchesQuery.isLoading && (
+                                    <Text size="xs" c="blue" mt={-10} mb="sm">
+                                        New Batch will be created.
+                                    </Text>
+                                )}
+
+                                <DateInput
+                                    label="Expiry Date"
+                                    placeholder="Select date"
+                                    valueFormat="DD.MM.YYYY"
+                                    minDate={new Date()}
+                                    {...form.getInputProps('expiry_date')}
+                                    required
+                                />
+                            </>
+                        )}
 
                         <NumberInput
                             label="Quantity (kg)"

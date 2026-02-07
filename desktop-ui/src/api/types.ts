@@ -38,9 +38,34 @@ export interface WeighInDraft {
     status: 'DRAFT' | 'APPROVED' | 'REJECTED';
     source: string;
     created_by_user_id?: number | null;
+    draft_group_id: number; // Mandatory for TASK-0001+
     client_event_id: string;
     note?: string;
     created_at: string;
+}
+
+export interface DraftGroup {
+    id: number;
+    name: string;
+    status: 'DRAFT' | 'APPROVED' | 'REJECTED';
+    source: string;
+    location_id: number;
+    created_at: string;
+    created_by_user_id: number;
+    line_count?: number;
+    total_quantity_kg?: number;
+    lines?: WeighInDraft[];
+}
+
+export interface DraftGroupSummary {
+    id: number;
+    name: string;
+    status: 'DRAFT' | 'APPROVED' | 'REJECTED';
+    source: string;
+    line_count: number;
+    total_quantity_kg: number;
+    created_at: string;
+    created_by_name?: string;
 }
 
 export interface InventoryItem {
@@ -49,6 +74,7 @@ export interface InventoryItem {
     article_id: number;
     article_no: string;
     description?: string;
+    is_paint: boolean; // Added for categorizing inventory
     batch_id: number;
     batch_code: string;
     expiry_date?: string;
@@ -151,8 +177,28 @@ export interface StockReceivePayload {
     batch_code: string;
     quantity_kg: number;
     expiry_date: string; // YYYY-MM-DD
+    order_number: string; // REQUIRED for TASK-0011
     received_date?: string; // YYYY-MM-DD
     note?: string;
+}
+
+export interface ReceiptHistoryLine {
+    article_no: string;
+    description: string;
+    batch_code: string;
+    quantity_kg: number;
+}
+
+export interface ReceiptHistoryGroup {
+    receipt_key: string;
+    order_number: string;
+    received_at: string;
+    lines: ReceiptHistoryLine[];
+}
+
+export interface ReceiptHistoryResponse {
+    history: ReceiptHistoryGroup[];
+    total: number;
 }
 
 export interface StockReceiveResponse {
@@ -162,4 +208,15 @@ export interface StockReceiveResponse {
     new_stock: string;
     quantity_received: string;
     transaction: any;
+}
+
+export interface CreateDraftGroupPayload {
+    name?: string;
+    lines: Array<{
+        article_id: number;
+        batch_id: number;
+        quantity_kg: number;
+        note?: string;
+        client_event_id: string;
+    }>;
 }
