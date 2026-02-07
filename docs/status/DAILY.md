@@ -4,6 +4,22 @@ This is a running log of daily progress. Keep entries brief (3-5 sentences max).
 
 ---
 
+## 2026-02-07 (Friday)
+
+**Danas**:
+- ✅ **Core Refinement v2 (TASK-0010 & TASK-0011)**:
+  - **Backend**: Transaction `order_number` + Index, Grouping API, Atomic Approvals.
+  - **Frontend**: Manual/Scale toggle, Barcode Listener, Inventory Tabs, Order Number in Receiving.
+  - **Docs**: Updated Changelog and created Task Briefs.
+
+**Sutra**:
+- Deployment preparation (Raspberry Pi setup).
+- End-to-end testing of new Receiving flow.
+
+**Blok**: None
+
+---
+
 ## 2026-02-04 (Tuesday)
 
 **Danas**:

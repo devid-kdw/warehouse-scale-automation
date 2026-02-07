@@ -8,6 +8,52 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-07 - Core Refinement v2
+**What**: Backend and Frontend updates for stricter data integrity and better UX.
+
+**Why**: Align with "Project Knowledge v1.0", improve receiving workflow (order numbers), and refine Operator/Admin draft experience.
+
+**Changes**:
+- **Backend (TASK-0010)**:
+  - Added `order_number` to `Transaction` model with index and normalization.
+  - Implemented strict Atomicity for Draft Group approval.
+  - Implemented Receipt Grouping API logic.
+  - Consumables logic: `is_paint=False` uses system batch "NA".
+  - Migrations: `c8f64cf6440c_add_order_number_and_indexes.py`
+  
+- **Frontend (TASK-0011)**:
+  - **Draft Entry**: Added Manual/Scale toggle (persisted) and non-invasive Barcode listener.
+  - **Receiving**: Added `Order Number` field (required) and validation.
+  - **Inventory**: Added tabs for Paint vs Consumables.
+  - **UX**: Improved batch selection and error handling.
+
+**How to Test**:
+- Receiving: Submit without order number -> Error.
+- Draft Entry: Toggle "Scale", refresh page -> stays "Scale".
+- Migration: `flask db upgrade` maps new columns.
+
+**Ref**: TASK-0010, TASK-0011
+
+---
+
+### 2026-02-04 - Draft Groups (Bulk Approval)
+**What**: Implemented Draft Groups for atomic multi-line weigh-in draft operations.
+
+**Why**: Enable users to approve or reject groups of drafts simultaneously with guaranteed data consistency and inventory checks.
+
+**Changes**:
+- **Backend**:
+  - New `DraftGroup` model and relationship to `WeighInDraft`.
+  - Service layer with row-level locking and atomic availability pre-checks.
+  - New APIs for bulk creation and group approval/rejection.
+  - Backward compatibility: v1 single-draft API auto-creates groups.
+  - Manual migration with data backfill for existing drafts.
+- **Verification**: 9 new tests covering atomic success, rollback logic, and precision.
+
+**How to Test**: `pytest tests/test_draft_groups.py -v`
+
+---
+
 ### 2026-02-04 - Article v1.2 & JWT Security Policy
 **What**: Updated Article model with standard paint fields and tightened JWT security.
 
