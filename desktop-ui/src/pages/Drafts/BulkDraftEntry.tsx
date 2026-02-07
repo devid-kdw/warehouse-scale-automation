@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import {
     Table, TextInput, NumberInput, ActionIcon, Button,
-    Group, Select, Stack, Tooltip
+    Group, Select, Stack, Tooltip, Badge
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { IconTrash, IconPlus, IconCheck, IconX, IconArrowRight, IconCopy } from '@tabler/icons-react';
@@ -24,7 +24,8 @@ export default function BulkDraftEntry() {
             article_no: a.article_no,
             description: a.description,
             manufacturer: a.manufacturer,
-            uom: a.uom
+            uom: a.uom,
+            is_paint: a.is_paint
         })),
     });
 
@@ -38,7 +39,14 @@ export default function BulkDraftEntry() {
         validate: {
             lines: {
                 article_id: (val) => !val ? 'Required' : null,
-                batch_id: (val) => !val ? 'Required' : null,
+                batch_id: (val, values, path) => {
+                    const index = parseInt(path.split('.')[1]);
+                    const articleId = values.lines[index].article_id;
+                    const article = articlesQuery.data?.find(a => a.value === articleId);
+                    const isConsumable = article && article.is_paint === false;
+                    if (isConsumable) return null;
+                    return !val ? 'Required' : null;
+                },
                 quantity_kg: (val) => val <= 0 ? 'Must be > 0' : null,
             }
         }
@@ -50,7 +58,7 @@ export default function BulkDraftEntry() {
                 name: values.name || undefined,
                 lines: values.lines.map(l => ({
                     article_id: parseInt(l.article_id),
-                    batch_id: parseInt(l.batch_id),
+                    batch_id: l.batch_id ? parseInt(l.batch_id) : null,
                     quantity_kg: l.quantity_kg,
                     note: l.note,
                     client_event_id: l.client_event_id
@@ -85,7 +93,7 @@ export default function BulkDraftEntry() {
                 name: values.name || undefined,
                 lines: values.lines.map(l => ({
                     article_id: parseInt(l.article_id),
-                    batch_id: parseInt(l.batch_id),
+                    batch_id: l.batch_id ? parseInt(l.batch_id) : null,
                     quantity_kg: l.quantity_kg,
                     note: l.note,
                     client_event_id: l.client_event_id
@@ -196,13 +204,14 @@ export default function BulkDraftEntry() {
 function Row({ index, form, articles }: { index: number, form: any, articles: any[] }) {
     const articleId = form.values.lines[index].article_id;
     const selectedArticle = articles.find(a => a.value === articleId);
+    const isConsumable = selectedArticle && selectedArticle.is_paint === false;
     const selectRef = useRef<HTMLInputElement>(null);
 
     // Fetch batches for this specific row
     const batchesQuery = useQuery({
         queryKey: ['batches', selectedArticle?.article_no],
         queryFn: () => getBatchesByArticle(selectedArticle!.article_no),
-        enabled: !!selectedArticle?.article_no,
+        enabled: !!selectedArticle?.article_no && !isConsumable,
     });
 
     const batchOptions = batchesQuery.data?.items.map(b => ({
@@ -267,13 +276,17 @@ function Row({ index, form, articles }: { index: number, form: any, articles: an
                 />
             </Table.Td>
             <Table.Td>
-                <Select
-                    placeholder={!articleId ? "Select article" : "Select batch"}
-                    data={batchOptions}
-                    searchable
-                    disabled={!articleId || batchesQuery.isLoading}
-                    {...form.getInputProps(`lines.${index}.batch_id`)}
-                />
+                {selectedArticle?.is_paint === false ? (
+                    <Badge color="gray" variant="light" fullWidth>System Batch (NA)</Badge>
+                ) : (
+                    <Select
+                        placeholder={!articleId ? "Select article" : "Select batch"}
+                        data={batchOptions}
+                        searchable
+                        disabled={!articleId || batchesQuery.isLoading}
+                        {...form.getInputProps(`lines.${index}.batch_id`)}
+                    />
+                )}
             </Table.Td>
             <Table.Td>
                 <NumberInput
