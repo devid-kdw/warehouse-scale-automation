@@ -5,6 +5,7 @@ from flask_smorest import Blueprint
 from flask_jwt_extended import jwt_required
 
 from ..extensions import db
+from ..auth import require_roles
 from ..models import Stock, Surplus, Transaction, Location, Article, Batch
 from ..schemas.reports import (
     InventoryReportSchema, TransactionReportSchema, ReportQuerySchema
@@ -27,7 +28,9 @@ class InventoryReport(MethodView):
     @blp.arguments(ReportQuerySchema, location='query')
     @blp.response(200, InventoryReportSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @jwt_required()
+    @require_roles('ADMIN')
     def get(self, query_args):
         """Get inventory report.
         
@@ -97,7 +100,9 @@ class TransactionReport(MethodView):
     @blp.arguments(ReportQuerySchema, location='query')
     @blp.response(200, TransactionReportSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
     @jwt_required()
+    @require_roles('ADMIN')
     def get(self, query_args):
         """Get transaction report.
         

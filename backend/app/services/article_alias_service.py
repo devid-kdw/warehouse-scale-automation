@@ -1,6 +1,8 @@
 """Article alias service - CRUD with uniqueness and limit rules."""
 from typing import Optional
 
+from sqlalchemy import func
+
 from ..extensions import db
 from ..models import Article, ArticleAlias
 from ..error_handling import AppError
@@ -15,7 +17,7 @@ def create_alias(article_id: int, alias: str) -> ArticleAlias:
     
     Args:
         article_id: Article ID
-        alias: Alias string
+        alias: Alias string (will be trimmed and uppercased)
         
     Returns:
         Created ArticleAlias
@@ -23,6 +25,11 @@ def create_alias(article_id: int, alias: str) -> ArticleAlias:
     Raises:
         AppError: If article not found, alias limit reached, or alias already exists
     """
+    # Normalize alias
+    alias = alias.strip().upper()
+    if not alias:
+        raise AppError('VALIDATION_ERROR', 'Alias cannot be empty')
+    
     # Check article exists
     article = db.session.get(Article, article_id)
     if not article:
@@ -37,8 +44,10 @@ def create_alias(article_id: int, alias: str) -> ArticleAlias:
             {'current_count': current_count, 'max_allowed': MAX_ALIASES_PER_ARTICLE}
         )
     
-    # Check global uniqueness
-    existing = ArticleAlias.query.filter_by(alias=alias).first()
+    # Check global uniqueness (case-insensitive)
+    existing = ArticleAlias.query.filter(
+        func.upper(ArticleAlias.alias) == alias
+    ).first()
     if existing:
         raise AppError(
             'DUPLICATE_ALIAS',
@@ -46,7 +55,7 @@ def create_alias(article_id: int, alias: str) -> ArticleAlias:
             {'existing_article_id': existing.article_id}
         )
     
-    # Create alias
+    # Create alias (stored in normalized uppercase form)
     new_alias = ArticleAlias(article_id=article_id, alias=alias)
     db.session.add(new_alias)
     db.session.flush()
@@ -96,7 +105,7 @@ def delete_alias(alias_id: int) -> bool:
 
 
 def resolve_article(query: str) -> Optional[Article]:
-    """Find article by article_no or alias.
+    """Find article by article_no or alias (case-insensitive).
     
     Args:
         query: Search string (article_no or alias)
@@ -107,16 +116,22 @@ def resolve_article(query: str) -> Optional[Article]:
     Raises:
         AppError: If not found
     """
-    if not query:
+    if not query or not query.strip():
         raise AppError('VALIDATION_ERROR', 'Query is required')
     
-    # Try to find by article_no first
-    article = Article.query.filter_by(article_no=query).first()
+    normalized = query.strip().upper()
+    
+    # Try to find by article_no first (case-insensitive)
+    article = Article.query.filter(
+        func.upper(Article.article_no) == normalized
+    ).first()
     if article:
         return article
     
-    # Try to find by alias
-    alias = ArticleAlias.query.filter_by(alias=query).first()
+    # Try to find by alias (case-insensitive)
+    alias = ArticleAlias.query.filter(
+        func.upper(ArticleAlias.alias) == normalized
+    ).first()
     if alias:
         return alias.article
     

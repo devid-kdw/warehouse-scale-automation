@@ -19,6 +19,7 @@ import { EmptyState } from '../components/common/EmptyState';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 
 dayjs.extend(relativeTime);
 
@@ -105,6 +106,8 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
 
 export default function Inventory() {
     const navigate = useNavigate();
+    const auth = useAuth();
+    const isAdmin = auth.user?.role === 'ADMIN';
     const [search, setSearch] = useState('');
     const [activeTab, setActiveTab] = useState<string | null>('paint');
     const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
@@ -123,7 +126,9 @@ export default function Inventory() {
             item.batch_code.toLowerCase().includes(search.toLowerCase()) ||
             item.location_code.toLowerCase().includes(search.toLowerCase());
 
-        const matchesCategory = activeTab === 'paint' ? item.is_paint : !item.is_paint;
+        const matchesCategory = activeTab === 'paint'
+            ? (item.is_paint !== false)   // undefined or true => paint
+            : (item.is_paint === false);  // only explicit false => consumable
 
         return matchesSearch && matchesCategory;
     }) || [];
@@ -171,37 +176,39 @@ export default function Inventory() {
                 <Table.Td align="right">
                     <Text c="dimmed" size="sm">{item.updated_at ? dayjs(item.updated_at).fromNow() : '-'}</Text>
                 </Table.Td>
-                <Table.Td>
-                    <Menu shadow="md" width={200} position="bottom-end">
-                        <Menu.Target>
-                            <ActionIcon variant="subtle" color="gray">
-                                <IconDotsVertical size={16} />
-                            </ActionIcon>
-                        </Menu.Target>
+                {isAdmin && (
+                    <Table.Td>
+                        <Menu shadow="md" width={200} position="bottom-end">
+                            <Menu.Target>
+                                <ActionIcon variant="subtle" color="gray">
+                                    <IconDotsVertical size={16} />
+                                </ActionIcon>
+                            </Menu.Target>
 
-                        <Menu.Dropdown>
-                            <Menu.Label>Actions</Menu.Label>
-                            <Menu.Item
-                                leftSection={<IconPackageImport size={14} />}
-                                onClick={() => navigate('/receiving', {
-                                    state: {
-                                        article_id: item.article_id,
-                                        article_no: item.article_no,
-                                        description: item.description
-                                    }
-                                })}
-                            >
-                                Receive More
-                            </Menu.Item>
-                            <Menu.Item
-                                leftSection={<IconClipboardCheck size={14} />}
-                                onClick={() => openCountModal(item)}
-                            >
-                                Inventory Count
-                            </Menu.Item>
-                        </Menu.Dropdown>
-                    </Menu>
-                </Table.Td>
+                            <Menu.Dropdown>
+                                <Menu.Label>Actions</Menu.Label>
+                                <Menu.Item
+                                    leftSection={<IconPackageImport size={14} />}
+                                    onClick={() => navigate('/receiving', {
+                                        state: {
+                                            article_id: item.article_id,
+                                            article_no: item.article_no,
+                                            description: item.description
+                                        }
+                                    })}
+                                >
+                                    Receive More
+                                </Menu.Item>
+                                <Menu.Item
+                                    leftSection={<IconClipboardCheck size={14} />}
+                                    onClick={() => openCountModal(item)}
+                                >
+                                    Inventory Count
+                                </Menu.Item>
+                            </Menu.Dropdown>
+                        </Menu>
+                    </Table.Td>
+                )}
             </Table.Tr>
         );
     });
@@ -210,9 +217,11 @@ export default function Inventory() {
         <Container size="xl" py="xl">
             <Group justify="space-between" mb="lg">
                 <Title order={2}>Inventory Overview</Title>
-                <Button leftSection={<IconClipboardCheck size={16} />} disabled>
-                    Full Stocktake
-                </Button>
+                {isAdmin && (
+                    <Button leftSection={<IconClipboardCheck size={16} />} disabled>
+                        Full Stocktake
+                    </Button>
+                )}
             </Group>
 
             {isError && (
@@ -257,7 +266,7 @@ export default function Inventory() {
                                     <Table.Th>Expiry</Table.Th>
                                     <Table.Th style={{ textAlign: 'right' }}>Total Qty (KG)</Table.Th>
                                     <Table.Th style={{ textAlign: 'right' }}>Last Updated</Table.Th>
-                                    <Table.Th w={50}></Table.Th>
+                                    {isAdmin && <Table.Th w={50}></Table.Th>}
                                 </Table.Tr>
                             </Table.Thead>
                             <Table.Tbody>{rows}</Table.Tbody>

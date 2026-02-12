@@ -44,7 +44,7 @@ class TestLogin:
         
         assert response.status_code == 401
         data = response.get_json()
-        assert data['error']['code'] == 'INVALID_TOKEN'
+        assert data['error']['code'] == 'INVALID_CREDENTIALS'
     
     def test_login_nonexistent_user(self, client):
         """Non-existent user returns 401."""
@@ -173,3 +173,61 @@ class TestProtectedEndpoints:
         """Reports endpoint requires authentication."""
         response = client.get('/api/reports/inventory')
         assert response.status_code == 401
+
+
+class TestReportsRBAC:
+    """Test that reports are ADMIN-only per Rule 12."""
+    
+    def test_operator_cannot_access_inventory_report(self, client, app, user):
+        """OPERATOR cannot access reports/inventory."""
+        with app.app_context():
+            u = db.session.get(User, user)
+            u.role = 'OPERATOR'
+            db.session.commit()
+            
+            token = create_access_token(
+                identity=str(user),
+                additional_claims={'role': 'OPERATOR', 'username': 'testuser'}
+            )
+        
+        response = client.get(
+            '/api/reports/inventory',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 403
+    
+    def test_operator_cannot_access_transaction_report(self, client, app, user):
+        """OPERATOR cannot access reports/transactions."""
+        with app.app_context():
+            u = db.session.get(User, user)
+            u.role = 'OPERATOR'
+            db.session.commit()
+            
+            token = create_access_token(
+                identity=str(user),
+                additional_claims={'role': 'OPERATOR', 'username': 'testuser'}
+            )
+        
+        response = client.get(
+            '/api/reports/transactions',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 403
+    
+    def test_operator_can_access_inventory_summary(self, client, app, user):
+        """OPERATOR can access inventory summary per Rule 12."""
+        with app.app_context():
+            u = db.session.get(User, user)
+            u.role = 'OPERATOR'
+            db.session.commit()
+            
+            token = create_access_token(
+                identity=str(user),
+                additional_claims={'role': 'OPERATOR', 'username': 'testuser'}
+            )
+        
+        response = client.get(
+            '/api/inventory/summary',
+            headers={'Authorization': f'Bearer {token}'}
+        )
+        assert response.status_code == 200

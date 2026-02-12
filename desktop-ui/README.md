@@ -1,11 +1,11 @@
 # Warehouse Desktop UI
 
-Electron + React application for testing the Warehouse Automation Backend.
+Electron + React application for the Warehouse Automation system.
 
 ## Prerequisites
 
 - Node.js (v18+)
-- Backend running on `http://localhost:5001` (or other URL)
+- Backend running on `http://localhost:5001` (or configured URL)
 
 ## Setup
 
@@ -27,22 +27,36 @@ Run the application in development mode (Vite + Electron):
 npm run electron:dev
 ```
 
-## Configuration
+Or run just the web UI in the browser (for fast iteration):
 
-On first launch, you will be redirected to the **Settings** page.
+```bash
+npm run dev
+# Open http://localhost:5173
+```
 
-1.  **Base URL**: Enter your backend URL (default: `http://localhost:5001`).
-2.  **API Token**: Enter the Bearer token (e.g. from `.env` or `flask seed` output).
-3.  **Actor ID**: Enter the User ID to use for actions (default: `1`).
+## Configuration & Login
 
-## Troublehsooting
+On first launch you will see the **Login** screen.
 
-- **Connection Failed**: Ensure backend is running and `CORS` is enabled (or Electron context isolation handles it).
-- **White Screen**: Check console (Ctrl+Shift+I) for errors.
+1.  **Backend URL**: Configured in the **Settings** page (default: `http://localhost:5001`).
+2.  **Login**: Enter your **username** and **password**. The backend issues a JWT access token (15 min) and refresh token (7 days).
+3.  **Roles**: The JWT `role` claim controls what you see:
+    -   **OPERATOR**: Draft Entry + Inventory view (read-only).
+    -   **ADMIN**: Full access — Drafts, Approvals, Inventory, Receiving, Articles, Batches, Reports.
+
+No manual API tokens or actor IDs are needed — authentication is handled automatically via JWT.
+
+## Troubleshooting
+
+- **Connection Failed**: Ensure backend is running and reachable. Check Settings page for correct URL.
+- **White Screen**: Open DevTools (Ctrl+Shift+I / Cmd+Option+I) and check console for errors.
+- **401 Redirect Loop**: Token may have expired. Log out and log back in.
 - **Validation Errors**: Ensure you selected an Article before creating a Batch, and all IDs exist.
 
 ## Project Structure
 
-- `src/api`: Axios client, Types, and standardized Endpoints.
-- `src/pages`: React components for each screen.
-- `electron`: Main process code.
+- `src/api`: Axios client, Types, Endpoints, and Service functions.
+- `src/pages`: React page components for each screen.
+- `src/components`: Shared UI components (Sidebar, ErrorBoundary, etc.).
+- `src/hooks`: Custom React hooks (`useAuth`).
+- `electron`: Electron main process code.

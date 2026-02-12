@@ -130,7 +130,7 @@ export default function DraftGroupDetail({ groupId, onClose }: Props) {
                             </Table.Tr>
                         </Table.Thead>
                         <Table.Tbody>
-                            {group.lines?.map((line) => (
+                            {(group.drafts || group.lines)?.map((line) => (
                                 <Table.Tr key={line.id}>
                                     <Table.Td>{line.article_id}</Table.Td>
                                     <Table.Td>{line.batch_id}</Table.Td>

@@ -44,8 +44,8 @@ class TransactionList(MethodView):
             query = query.filter(Transaction.location_id == args['location_id'])
         if 'tx_type' in args:
             query = query.filter(Transaction.tx_type == args['tx_type'])
-        if 'from' in args:
-            query = query.filter(Transaction.occurred_at >= args['from'])
+        if 'from_' in args:
+            query = query.filter(Transaction.occurred_at >= args['from_'])
         if 'to' in args:
             query = query.filter(Transaction.occurred_at <= args['to'])
             

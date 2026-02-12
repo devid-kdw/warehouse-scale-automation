@@ -54,7 +54,7 @@ class Login(MethodView):
     def post(self, credentials):
         """Authenticate user and return JWT tokens.
         
-        Returns access_token (15 min) and refresh_token (30 days).
+        Returns access_token (15 min) and refresh_token (7 days).
         """
         user = authenticate_user(
             username=credentials['username'],
@@ -78,29 +78,19 @@ class Refresh(MethodView):
         Send refresh_token in Authorization header: Bearer <refresh_token>
         Returns new access_token.
         """
-        try:
-            user = get_current_user()
-            
-            # Create new access token with updated claims
-            from flask_jwt_extended import create_access_token
-            access_token = create_access_token(
-                identity=str(user.id),  # Must be string
-                additional_claims={
-                    'role': user.role,
-                    'username': user.username
-                }
-            )
-            
-            return {'access_token': access_token}
-            
-        except AuthError as e:
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': {}
-                }
-            }, 401
+        user = get_current_user()
+        
+        # Create new access token with updated claims
+        from flask_jwt_extended import create_access_token
+        access_token = create_access_token(
+            identity=str(user.id),  # Must be string
+            additional_claims={
+                'role': user.role,
+                'username': user.username
+            }
+        )
+        
+        return {'access_token': access_token}
 
 
 @blp.route('/me')
@@ -113,14 +103,5 @@ class CurrentUser(MethodView):
     @jwt_required()
     def get(self):
         """Get current user info from JWT."""
-        try:
-            user = get_current_user()
-            return user.to_dict()
-        except AuthError as e:
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': {}
-                }
-            }, 401
+        user = get_current_user()
+        return user.to_dict()

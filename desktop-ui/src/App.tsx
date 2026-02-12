@@ -131,7 +131,7 @@ function Layout() {
                         <RequireAdmin><Batches /></RequireAdmin>
                     } />
                     <Route path="/inventory" element={
-                        <RequireAdmin><Inventory /></RequireAdmin>
+                        <RequireAuth><Inventory /></RequireAuth>
                     } />
                     <Route path="/receiving" element={
                         <RequireAdmin><Receiving /></RequireAdmin>

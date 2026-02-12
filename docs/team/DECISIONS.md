@@ -9,14 +9,14 @@ Format: **Date** | **Decision** | **Rationale** | **Implications**
 ## Active Decisions
 
 ### 2026-02-03 - Single Location Policy (v1.x)
-**Decision**: Location is fixed to ID=1, code="13" for all v1.x releases.
+**Decision**: Location is fixed to ID=13 for all v1.x releases.
 
 **Rationale**: Simplifies implementation and UI. Multi-location support is not needed for initial warehouse deployment. Reduces complexity in inventory queries and draft creation.
 
 **Implications**:
 - UI does not show location selector (hardcoded)
-- API still accepts `location_id` parameter for future compatibility
-- All seed data must create location with code="13"
+- API can accept `location_id` parameter for future compatibility
+- All seed data must create location with id=13
 - Backend validates location existence but assumes single location
 
 ---
@@ -95,6 +95,24 @@ Format: **Date** | **Decision** | **Rationale** | **Implications**
 - Receiving workflow is ADMIN-only (operators cannot add stock)
 
 ---
+
+### 2026-02-12 - RBAC Clarification: OPERATOR Inventory View (Supersedes)
+**Decision**: OPERATOR can view inventory summary (`/api/inventory/summary`). OPERATOR cannot access reports or admin functions.
+
+**Supersedes**: 2026-02-03 RBAC entry which stated "OPERATOR can only create drafts" — this was inconsistent with the LOCKED Rule 12 table in `RULES_OF_ENGAGEMENT.md` which grants OPERATOR "View inventory ✅".
+
+**Updated permissions table**:
+- **OPERATOR**: Create drafts (weigh-in) + view inventory summary
+- **ADMIN**: Full access (drafts, approvals, inventory, reports, batches, articles, receiving)
+
+**Rationale**: Operators need to see current stock levels to make informed weighing decisions.
+
+**Implications**:
+- Frontend routes: `/inventory` accessible to OPERATOR
+- Backend: `/api/inventory/summary` allows `@require_roles('ADMIN', 'OPERATOR')`
+- Reports remain ADMIN-only
+- JWT tokens include `role` claim
+- Receiving workflow is ADMIN-only (operators cannot add stock)
 
 ### 2026-02-03 - Receiving Increases STOCK Only
 **Decision**: Receiving workflow increases `stock.quantity_kg`, never `surplus`.

@@ -54,7 +54,8 @@ export interface DraftGroup {
     created_by_user_id: number;
     line_count?: number;
     total_quantity_kg?: number;
-    lines?: WeighInDraft[];
+    drafts?: WeighInDraft[];  // Backend returns "drafts"
+    lines?: WeighInDraft[];   // Legacy alias — prefer drafts
 }
 
 export interface DraftGroupSummary {
@@ -74,7 +75,7 @@ export interface InventoryItem {
     article_id: number;
     article_no: string;
     description?: string;
-    is_paint: boolean; // Added for categorizing inventory
+    is_paint?: boolean; // Optional until backend TASK-0018 rollout
     batch_id: number;
     batch_code: string;
     expiry_date?: string;
@@ -221,4 +222,15 @@ export interface CreateDraftGroupPayload {
         note?: string;
         client_event_id: string;
     }>;
+}
+
+export interface TransactionQueryParams {
+    tx_type?: string;
+    from?: string;   // ISO datetime
+    to?: string;     // ISO datetime
+    article_id?: number;
+    batch_id?: number;
+    location_id?: number;
+    limit?: number;
+    offset?: number;
 }

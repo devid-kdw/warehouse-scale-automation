@@ -9,6 +9,8 @@ from .auth import AuthError
 # Error codes mapping
 ERROR_CODES = {
     'INVALID_TOKEN': 401,
+    'INVALID_CREDENTIALS': 401,
+    'ACCOUNT_DISABLED': 403,
     'VALIDATION_ERROR': 400,
     'DRAFT_NOT_FOUND': 404,
     'DRAFT_NOT_DRAFT': 409,
@@ -105,7 +107,8 @@ def register_error_handlers(app):
     
     @app.errorhandler(AuthError)
     def handle_auth_error(error):
-        return error_response('INVALID_TOKEN', error.message)
+        code = error.code if error.code in ERROR_CODES else 'INVALID_TOKEN'
+        return error_response(code, error.message)
     
     @app.errorhandler(AppError)
     def handle_app_error(error):

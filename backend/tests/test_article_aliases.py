@@ -74,3 +74,36 @@ def test_resolve_not_found(client, user):
     headers = get_headers(user)
     response = client.get('/api/articles/resolve?query=NONEXISTENT', headers=headers)
     assert response.status_code == 404
+
+
+def test_create_alias_case_insensitive_duplicate(client, app, user, article):
+    """Test that alias uniqueness is case-insensitive."""
+    headers = get_headers(user)
+    
+    # Create alias in uppercase
+    client.post(f'/api/articles/{article}/aliases', json={'alias': 'RAL9005'}, headers=headers)
+    
+    # Attempt lowercase duplicate
+    response = client.post(f'/api/articles/{article}/aliases', json={'alias': 'ral9005'}, headers=headers)
+    assert response.status_code == 409
+    assert 'DUPLICATE_ALIAS' in response.json['error']['code']
+
+
+def test_resolve_case_insensitive_lookup(client, app, user, article):
+    """Test that alias lookup is case-insensitive."""
+    headers = get_headers(user)
+    
+    # Create alias in uppercase
+    client.post(f'/api/articles/{article}/aliases', json={'alias': 'LOOKUP-TEST'}, headers=headers)
+    
+    # Resolve with lowercase
+    response = client.get('/api/articles/resolve?query=lookup-test', headers=headers)
+    assert response.status_code == 200
+    assert response.json['id'] == article
+
+
+def test_create_alias_empty_after_trim(client, app, user, article):
+    """Test that empty-after-trim alias is rejected."""
+    headers = get_headers(user)
+    response = client.post(f'/api/articles/{article}/aliases', json={'alias': '   '}, headers=headers)
+    assert response.status_code == 400

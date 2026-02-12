@@ -8,6 +8,52 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-12 - Frontend Contract, RBAC, and UX Alignment (TASK-0019)
+**What**: Align frontend with backend API contracts, apply RBAC policy, and clean up documentation.
+
+**Why**: Reports page sent unsupported query params, Draft Group detail mapped wrong response field, and OPERATOR inventory access was inconsistent with locked rules.
+
+**Changes**:
+- **Frontend (TASK-0019)**:
+  - **Reports**: Fixed query params to use `tx_type`, `from`/`to` (ISO), `limit`/`offset`. Updated type filter options to match backend enum.
+  - **Draft Group Detail**: Changed `group.lines` → `group.drafts` to match backend schema.
+  - **Inventory**: Added safe `is_paint` fallback (`undefined` → paint). OPERATOR read-only mode hides admin actions.
+  - **RBAC**: `/inventory` route now `RequireAuth` (OPERATOR can view). Sidebar updated.
+  - **Types**: Added `TransactionQueryParams`, `drafts` on `DraftGroup`, `is_paint` made optional on `InventoryItem`.
+  - **README**: Replaced obsolete API token/actor ID instructions with JWT login flow.
+
+**How to Test**:
+- Reports: apply tx_type + date filters, verify results.
+- Draft Group: open detail modal, verify lines render.
+- Inventory: OPERATOR login → view only (no action buttons). ADMIN → full actions.
+- Build: `npm run build` passes.
+
+**Ref**: TASK-0019, DECISIONS.md 2026-02-12 RBAC Clarification
+
+---
+
+### 2026-02-12 - Backend Contract, RBAC & Documentation Alignment (TASK-0018)
+**What**: RBAC enforcement on reports, inventory RBAC relaxed for OPERATOR, API contract fixes, and documentation sync.
+
+**Why**: Align backend with locked RULES_OF_ENGAGEMENT rules, fix frontend contract gaps, and resolve policy conflicts across docs.
+
+**Changes**:
+- **RBAC**: Reports endpoints now require ADMIN role (403 for OPERATOR). Inventory summary allows OPERATOR per Rule 12.
+- **Transaction Fix**: `from` query filter was broken due to Marshmallow `data_key` mapping (`from` → `from_`).
+- **Contract**: Inventory summary now includes `is_paint` field required by frontend tabs.
+- **Aliases**: Case-insensitive uniqueness and lookup (strip + uppercase normalization).
+- **Auth**: Login failures return `INVALID_CREDENTIALS` instead of generic `INVALID_TOKEN`.
+- **Docs**: Fixed refresh token lifetime (30d → 7d), location ID, and RBAC descriptions in README and DECISIONS.md.
+
+**How to Test**:
+- `pytest backend/tests/ -v` — all 87 tests pass.
+- Login as OPERATOR → call `/api/reports/transactions` → expect 403.
+- Call `/api/inventory/summary` → each item has `is_paint`.
+
+**Ref**: TASK-0018
+
+---
+
 ### 2026-02-10 - Frontend Cleanup and Improvements (TASK-0017)
 **What**: Critical fix for location ID, debug log removal, and UI reliability improvements.
 

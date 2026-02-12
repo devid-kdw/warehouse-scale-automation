@@ -78,14 +78,14 @@ curl -X POST http://localhost:5001/api/auth/refresh \
 | Token | Default Expiry | Env Var |
 |-------|----------------|---------|
 | Access | 15 minutes | JWT_ACCESS_EXPIRES_MINUTES |
-| Refresh | 30 days | JWT_REFRESH_EXPIRES_DAYS |
+| Refresh | 7 days | JWT_REFRESH_EXPIRES_DAYS |
 
 ### Role-Based Access Control
 
 | Role | Permissions |
 |------|-------------|
-| **ADMIN** | All operations: approve/reject drafts, create articles/batches, inventory adjustments |
-| **OPERATOR** | Create drafts, view drafts/articles/batches/reports |
+| **ADMIN** | All operations: approve/reject drafts, create articles/batches, inventory adjustments, reports |
+| **OPERATOR** | Create drafts, view inventory summary |
 
 ---
 
@@ -153,7 +153,7 @@ pytest tests/ -v
 | DATABASE_URL | localhost/warehouse | PostgreSQL connection |
 | JWT_SECRET_KEY | dev-secret-... | **REQUIRED in production** |
 | JWT_ACCESS_EXPIRES_MINUTES | 15 | Access token lifetime |
-| JWT_REFRESH_EXPIRES_DAYS | 30 | Refresh token lifetime |
+| JWT_REFRESH_EXPIRES_DAYS | 7 | Refresh token lifetime |
 | APP_HOST | 127.0.0.1 | Server host |
 | APP_PORT | 5001 | Server port |
 | ENV | development | Environment |

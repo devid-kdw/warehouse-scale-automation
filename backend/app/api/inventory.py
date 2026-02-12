@@ -137,9 +137,9 @@ class InventorySummary(MethodView):
     @blp.arguments(InventorySummaryQuerySchema, location='query')
     @blp.response(200, InventorySummaryResponseSchema)
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
-    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Role required (ADMIN or OPERATOR)')
     @jwt_required()
-    @require_roles('ADMIN')
+    @require_roles('ADMIN', 'OPERATOR')
     def get(self, args):
         """Get inventory summary (stock + surplus).
         
@@ -254,6 +254,7 @@ class InventorySummary(MethodView):
                 'stock_qty': float(stock_qty),
                 'surplus_qty': float(surplus_qty),
                 'total_qty': float(stock_qty) + float(surplus_qty),
+                'is_paint': article.is_paint,
                 'updated_at': updated_at.isoformat() if updated_at else None
             })
             
@@ -423,4 +424,3 @@ class ReceiptHistory(MethodView):
         history = list(receipts_map.values())
         
         return {'history': history, 'total': len(history)}
-

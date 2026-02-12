@@ -6,7 +6,7 @@ import {
     CreateArticlePayload, CreateBatchPayload, StockReceivePayload, StockReceiveResponse,
     InventoryResponse, InventoryCountPayload, TransactionsResponse, AliasesResponse,
     DraftGroup, DraftGroupSummary, CreateDraftGroupPayload,
-    ReceiptHistoryResponse
+    ReceiptHistoryResponse, TransactionQueryParams
 } from './types';
 import { AxiosError } from 'axios';
 
@@ -145,7 +145,7 @@ export const getReceiptHistory = async () => {
 
 
 // --- Transactions ---
-export const getTransactions = async (params?: any) => {
+export const getTransactions = async (params?: TransactionQueryParams) => {
     const response = await apiClient.get<TransactionsResponse>(API_ENDPOINTS.TRANSACTIONS.LIST, {
         params
     });

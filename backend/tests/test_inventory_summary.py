@@ -32,6 +32,7 @@ def test_inventory_summary_with_data(client, user, location, article, batch, sto
     assert item['stock_qty'] == 10.0
     assert item['surplus_qty'] == 5.0
     assert item['total_qty'] == 15.0
+    assert 'is_paint' in item
 
 
 def test_inventory_summary_filters(client, app, user, location, article):

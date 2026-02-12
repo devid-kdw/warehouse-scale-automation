@@ -34,7 +34,7 @@ export function Sidebar({ isAdmin = false }: SidebarProps) {
         // ADMIN ONLY
         { icon: IconPackageImport, label: 'Receive Stock', to: '/receiving', roles: ['ADMIN'] },
         { icon: IconHistory, label: 'Receipt History', to: '/inventory/receipts', roles: ['ADMIN'] },
-        { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN'] },
+        { icon: IconServer, label: 'Inventory', to: '/inventory', roles: ['ADMIN', 'OPERATOR'] },
         { icon: IconChecklist, label: 'Approvals', to: '/drafts', roles: ['ADMIN'] },
         { icon: IconPackage, label: 'Articles', to: '/articles', roles: ['ADMIN'] },
         { icon: IconTags, label: 'Batches', to: '/batches', roles: ['ADMIN'] },

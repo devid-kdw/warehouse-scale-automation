@@ -20,6 +20,7 @@ class InventorySummaryItemSchema(Schema):
     stock_qty = fields.Float()
     surplus_qty = fields.Float()
     total_qty = fields.Float()
+    is_paint = fields.Boolean()
     updated_at = fields.String(allow_none=True)
 
 

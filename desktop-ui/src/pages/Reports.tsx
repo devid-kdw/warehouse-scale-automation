@@ -1,30 +1,43 @@
 import { useState } from 'react';
 import {
-    Container, Title, Paper, Table, Group, Button, TextInput,
+    Container, Title, Paper, Table, Group, Button,
     Badge, LoadingOverlay, Text, Box, Select
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useQuery } from '@tanstack/react-query';
-import { IconSearch, IconFileSpreadsheet } from '@tabler/icons-react';
+import { IconFileSpreadsheet } from '@tabler/icons-react';
 import { getTransactions, extractErrorMessage } from '../api/services';
 import { Transaction } from '../api/types';
 import { EmptyState } from '../components/common/EmptyState';
 import dayjs from 'dayjs';
 
+const TX_TYPE_OPTIONS = [
+    { value: 'WEIGH_IN', label: 'Weigh-In' },
+    { value: 'SURPLUS_CONSUMED', label: 'Surplus Consumed' },
+    { value: 'STOCK_CONSUMED', label: 'Stock Consumed' },
+    { value: 'INVENTORY_ADJUSTMENT', label: 'Inventory Adjustment' },
+];
+
+const TX_TYPE_COLORS: Record<string, string> = {
+    'WEIGH_IN': 'green',
+    'SURPLUS_CONSUMED': 'orange',
+    'STOCK_CONSUMED': 'blue',
+    'INVENTORY_ADJUSTMENT': 'violet',
+    'STOCK_RECEIPT': 'teal',
+};
+
 export default function Reports() {
-    const [page] = useState(1);
-    const [search, setSearch] = useState('');
-    const [typeFilter, setTypeFilter] = useState<string | null>(null);
+    const [txType, setTxType] = useState<string | null>(null);
     const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([null, null]);
 
     const { data, isLoading, isError, error } = useQuery({
-        queryKey: ['transactions', page, search, typeFilter, dateRange],
+        queryKey: ['transactions', txType, dateRange],
         queryFn: () => getTransactions({
-            page,
-            search,
-            type: typeFilter,
-            start_date: dateRange[0] ? dayjs(dateRange[0]).format('YYYY-MM-DD') : undefined,
-            end_date: dateRange[1] ? dayjs(dateRange[1]).format('YYYY-MM-DD') : undefined,
+            tx_type: txType || undefined,
+            from: dateRange[0] ? dayjs(dateRange[0]).startOf('day').toISOString() : undefined,
+            to: dateRange[1] ? dayjs(dateRange[1]).endOf('day').toISOString() : undefined,
+            limit: 200,
+            offset: 0,
         }),
     });
 
@@ -33,13 +46,7 @@ export default function Reports() {
             <Table.Td>{tx.id}</Table.Td>
             <Table.Td>{dayjs(tx.occurred_at).format('DD.MM.YYYY HH:mm')}</Table.Td>
             <Table.Td>
-                <Badge
-                    color={
-                        tx.tx_type === 'WEIGH_IN' ? 'green' :
-                            tx.tx_type === 'CONSUMPTION' ? 'blue' :
-                                'gray'
-                    }
-                >
+                <Badge color={TX_TYPE_COLORS[tx.tx_type] || 'gray'}>
                     {tx.tx_type}
                 </Badge>
             </Table.Td>
@@ -64,22 +71,14 @@ export default function Reports() {
 
             <Paper shadow="xs" p="md" withBorder mb="lg">
                 <Group align="flex-end">
-                    <TextInput
-                        label="Search"
-                        placeholder="Article, Batch, User..."
-                        leftSection={<IconSearch size={16} />}
-                        value={search}
-                        onChange={(e) => setSearch(e.currentTarget.value)}
-                        style={{ flex: 1 }}
-                    />
                     <Select
-                        label="Type"
+                        label="Transaction Type"
                         placeholder="All Types"
-                        data={['WEIGH_IN', 'CONSUMPTION', 'ADJUSTMENT']}
-                        value={typeFilter}
-                        onChange={setTypeFilter}
+                        data={TX_TYPE_OPTIONS}
+                        value={txType}
+                        onChange={setTxType}
                         clearable
-                        style={{ width: 200 }}
+                        style={{ width: 220 }}
                     />
                     <DatePickerInput
                         type="range"
@@ -87,7 +86,8 @@ export default function Reports() {
                         placeholder="Pick dates"
                         value={dateRange}
                         onChange={setDateRange}
-                        style={{ width: 250 }}
+                        clearable
+                        style={{ width: 280 }}
                     />
                 </Group>
             </Paper>
