@@ -39,8 +39,8 @@ class InventorySummaryResponseSchema(Schema):
 class InventoryCountRequestSchema(Schema):
     """Schema for inventory count request."""
     location_id = fields.Integer(
-        load_default=1,
-        metadata={'description': 'Location ID (defaults to 1)'}
+        load_default=13,
+        metadata={'description': 'Location ID (defaults to 13)'}
     )
     article_id = fields.Integer(
         required=True,
@@ -87,8 +87,8 @@ class InventoryCountResponseSchema(Schema):
 class StockReceiveRequestSchema(Schema):
     """Schema for stock receiving request."""
     location_id = fields.Integer(
-        load_default=1,
-        metadata={'description': 'Location ID (defaults to 1, only 1 allowed in v1)'}
+        load_default=13,
+        metadata={'description': 'Location ID (defaults to 13, primary warehouse location)'}
     )
     article_id = fields.Integer(
         required=True,
@@ -124,6 +124,11 @@ class StockReceiveRequestSchema(Schema):
         allow_none=True,
         validate=validate.Length(max=500),
         metadata={'description': 'Optional note'}
+    )
+    client_event_id = fields.String(
+        allow_none=True,
+        validate=validate.Length(max=100),
+        metadata={'description': 'Optional client-generated UUID for idempotency'}
     )
 
 

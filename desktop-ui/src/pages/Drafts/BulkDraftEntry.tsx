@@ -55,6 +55,7 @@ export default function BulkDraftEntry() {
     const createMutation = useMutation({
         mutationFn: (values: typeof form.values) => {
             return createDraftGroup({
+                location_id: 13,
                 name: values.name || undefined,
                 lines: values.lines.map(l => ({
                     article_id: parseInt(l.article_id),
@@ -90,6 +91,7 @@ export default function BulkDraftEntry() {
         mutationFn: async (values: typeof form.values) => {
             // 2-step: create then approve
             const group = await createDraftGroup({
+                location_id: 13,
                 name: values.name || undefined,
                 lines: values.lines.map(l => ({
                     article_id: parseInt(l.article_id),

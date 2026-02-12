@@ -116,7 +116,7 @@ class TestReceiptHistory:
             
             tx = Transaction(
                 tx_type='STOCK_RECEIPT',
-                location_id=1,
+                location_id=location,
                 article_id=article,
                 batch_id=b.id,
                 quantity_kg=Decimal('5.00'),

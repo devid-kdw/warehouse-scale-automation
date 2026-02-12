@@ -172,7 +172,7 @@ export interface InventoryCountPayload {
 }
 
 export interface StockReceivePayload {
-    location_id?: number; // Defaults to 1
+    location_id?: number; // Defaults to 13
     article_id: number;
     batch_code: string;
     quantity_kg: number;
@@ -187,6 +187,7 @@ export interface ReceiptHistoryLine {
     description: string;
     batch_code: string;
     quantity_kg: number;
+    user_name?: string;
 }
 
 export interface ReceiptHistoryGroup {
@@ -211,6 +212,7 @@ export interface StockReceiveResponse {
 }
 
 export interface CreateDraftGroupPayload {
+    location_id?: number; // Defaults to 13 on backend
     name?: string;
     lines: Array<{
         article_id: number;

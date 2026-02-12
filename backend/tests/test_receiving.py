@@ -28,7 +28,7 @@ class TestReceiveStockSuccess:
                 expiry_date=expiry,
                 actor_user_id=user,
                 order_number='PO-1001',
-                location_id=1,
+                location_id=location,
                 client_event_id='evt-1'
             )
             db.session.commit()
@@ -43,7 +43,7 @@ class TestReceiveStockSuccess:
             
             # Verify stock in DB
             stock = Stock.query.filter_by(
-                location_id=1,
+                location_id=location,
                 article_id=article,
                 batch_id=result['batch_id']
             ).first()

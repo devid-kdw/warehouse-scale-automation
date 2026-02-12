@@ -17,6 +17,7 @@ import ReceiptHistory from './pages/Inventory/ReceiptHistory';
 import logo from './assets/enikon-logo.jpg';
 import BulkDraftEntry from './pages/Drafts/BulkDraftEntry';
 import { logout } from './api/auth';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -161,14 +162,16 @@ function Layout() {
 
 function App() {
     return (
-        <QueryClientProvider client={queryClient}>
-            <HashRouter>
-                <Routes>
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/*" element={<Layout />} />
-                </Routes>
-            </HashRouter>
-        </QueryClientProvider>
+        <ErrorBoundary>
+            <QueryClientProvider client={queryClient}>
+                <HashRouter>
+                    <Routes>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/*" element={<Layout />} />
+                    </Routes>
+                </HashRouter>
+            </QueryClientProvider>
+        </ErrorBoundary>
     );
 }
 

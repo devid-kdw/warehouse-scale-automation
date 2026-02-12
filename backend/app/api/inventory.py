@@ -18,7 +18,6 @@ from ..schemas.inventory import (
     InventoryCountRequestSchema,
     InventoryCountResponseSchema,
     StockReceiveRequestSchema,
-    StockReceiveRequestSchema,
     StockReceiveResponseSchema,
     ReceiptHistoryResponseSchema
 )
@@ -100,7 +99,7 @@ class InventoryAdjust(MethodView):
         """
         try:
             # Get actor from JWT
-            actor_user_id = get_jwt_identity()
+            actor_user_id = int(get_jwt_identity())
             
             result = adjust_inventory(
                 location_id=data['location_id'],
@@ -202,9 +201,9 @@ class InventorySummary(MethodView):
         # Better approach for summary:
         # Union Stock and Surplus keys (loc, art, batch)
         # But standard use case is single location (1).
-        # Let's default location_id=1 if not provided, to simplify.
+        # Let's default location_id=13 if not provided, to simplify.
         
-        target_location_id = location_id if location_id else 1
+        target_location_id = location_id if location_id else 13
         
         # Re-build query with specific location
         query = db.session.query(
@@ -279,29 +278,19 @@ class InventoryCount(MethodView):
         - Adjusts surplus if count > total
         - Resets surplus and creates shortage draft if count < total
         """
-        actor_user_id = get_jwt_identity()
+        actor_user_id = int(get_jwt_identity())
         
-        try:
-            result = inventory_count_service.perform_inventory_count(
-                location_id=data['location_id'],
-                article_id=data['article_id'],
-                batch_id=data['batch_id'],
-                counted_total_qty=data['counted_total_qty'],
-                actor_user_id=actor_user_id,
-                note=data.get('note'),
-                client_event_id=data.get('client_event_id')
-            )
-            db.session.commit()
-            return result
-        except AppError as e:
-            db.session.rollback()
-            return {
-                'error': {
-                    'code': e.error_code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, e.status_code
+        result = inventory_count_service.perform_inventory_count(
+            location_id=data['location_id'],
+            article_id=data['article_id'],
+            batch_id=data['batch_id'],
+            counted_total_qty=data['counted_total_qty'],
+            actor_user_id=actor_user_id,
+            note=data.get('note'),
+            client_event_id=data.get('client_event_id')
+        )
+        db.session.commit()
+        return result
 
 
 @blp.route('/receive')
@@ -327,7 +316,7 @@ class InventoryReceive(MethodView):
         - If batch exists with NULL expiry: backfills expiry_date
         - If batch doesn't exist: auto-creates with provided expiry_date
         """
-        actor_user_id = get_jwt_identity()
+        actor_user_id = int(get_jwt_identity())
         
         try:
             result = receive_stock(
@@ -337,7 +326,7 @@ class InventoryReceive(MethodView):
                 expiry_date=data['expiry_date'],
                 actor_user_id=actor_user_id,
                 order_number=data['order_number'],
-                location_id=data.get('location_id', 1),
+                location_id=data.get('location_id', 13),
                 received_date=data.get('received_date'),
                 note=data.get('note'),
                 client_event_id=data.get('client_event_id')

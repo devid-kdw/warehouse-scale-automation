@@ -8,7 +8,7 @@ from app.models import Stock, Surplus, Transaction, WeighInDraft
 
 
 def get_headers(user_id):
-    token = create_access_token(identity=user_id, additional_claims={'role': 'ADMIN'})
+    token = create_access_token(identity=str(user_id), additional_claims={'role': 'ADMIN'})
     return {'Authorization': f'Bearer {token}'}
 
 
@@ -38,7 +38,7 @@ def test_approve_shortage_draft_success(client, app, user, shortage_draft, stock
     headers = get_headers(user)
     
     # Stock is 10 (from fixture). Draft is 5.
-    response = client.post(f'/api/approvals/{shortage_draft}/approve', headers=headers)
+    response = client.post(f'/api/drafts/{shortage_draft}/approve', headers=headers)
     assert response.status_code == 200
     
     with app.app_context():
@@ -63,7 +63,7 @@ def test_approve_shortage_draft_insufficient_stock(client, app, user, shortage_d
         d.quantity_kg = Decimal('15.00')
         db.session.commit()
         
-    response = client.post(f'/api/approvals/{shortage_draft}/approve', headers=headers)
+    response = client.post(f'/api/drafts/{shortage_draft}/approve', headers=headers)
     # Expect 409 or similar (Insufficient Stock)
     # The exact status code depends on exception handler config
     # Assuming 409 INSUFFICIENT_STOCK

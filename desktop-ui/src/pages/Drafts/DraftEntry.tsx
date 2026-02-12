@@ -39,7 +39,7 @@ export default function DraftEntry() {
 
     const form = useForm({
         initialValues: {
-            location_id: '1',
+            location_id: '13',
             article_id: '',
             batch_id: '',
             quantity_kg: 0,

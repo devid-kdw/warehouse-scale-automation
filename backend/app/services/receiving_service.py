@@ -20,7 +20,7 @@ def receive_stock(
     expiry_date: date,
     actor_user_id: int,
     order_number: str,
-    location_id: int = 1,
+    location_id: int = 13,
     received_date: Optional[date] = None,
     note: Optional[str] = None,
     client_event_id: Optional[str] = None
@@ -36,7 +36,7 @@ def receive_stock(
         expiry_date: Required expiry date
         actor_user_id: User ID from JWT token
         order_number: REQUIRED order number (e.g. PO-123)
-        location_id: Location ID (default=1, only 1 allowed in v1)
+        location_id: Location ID (default=13, primary warehouse location)
         received_date: Date of receipt (defaults to today)
         note: Optional note
         client_event_id: Optional UUID for grouping/idempotency
@@ -100,11 +100,11 @@ def receive_stock(
     if not location:
         raise AppError('LOCATION_NOT_FOUND', f'Location {location_id} not found')
     
-    # v1: Only location_id=1 allowed
-    if location_id != 1:
+    # v1: Only location_id=13 allowed
+    if location_id != 13:
         raise AppError(
             'LOCATION_NOT_ALLOWED',
-            'Only location ID 1 is allowed in v1',
+            'Only location ID 13 is allowed in v1',
             {'location_id': location_id}
         )
     

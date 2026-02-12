@@ -8,6 +8,50 @@ Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**
 
 ## [Unreleased]
 
+### 2026-02-10 - Frontend Cleanup and Improvements (TASK-0017)
+**What**: Critical fix for location ID, debug log removal, and UI reliability improvements.
+
+**Why**: Align frontend with Backend (Rule 3) by standardizing location ID to 13, improve security by removing debug logs, and enhance UX with better receipt history and error tracking.
+
+**Changes**:
+- **Frontend (TASK-0017)**:
+  - **Location ID**: Changed all hardcoded `location_id: 1` to `13` (Receiving, Draft Entry, Bulk Entry, and Types).
+  - **Security**: Gated API client `console.log` statements behind `DEV` mode check in `client.ts`.
+  - **Receipt History**: Added "Received By" column to display the name of the user who processed the receipt.
+  - **Reliability**: Added a global `ErrorBoundary` component to catch and display UI crashes gracefully.
+  - **Types**: Added `location_id` to `CreateDraftGroupPayload` and `user_name` to `ReceiptHistoryLine`.
+
+**How to Test**:
+- Open Bulk Entry or Receiving -> Submit -> Verify `location_id: 13` in network payload.
+- View Receipt History -> Verify "Received By" column is visible.
+- Check browser console in production build -> No `[API Client]` logs should appear.
+
+**Ref**: TASK-0017, RULES_OF_ENGAGEMENT Rule 3
+
+---
+
+### 2026-02-10 - Backend Bugfixes and Hardening (TASK-0016)
+**What**: Critical bug fixes for backend services, consistency improvements, and security hardening.
+
+**Why**: Fix duplicate logic, resolve test failures, standardize location ID to 13, and improve error handling.
+
+**Changes**:
+- **Backend (TASK-0016)**:
+  - **Location ID**: Changed default `location_id` from 1 to 13 across all services and APIs (Rule 3).
+  - **Logic Fixes**: Removed duplicate batch ID resolution in `draft_group_service`.
+  - **Error Handling**: Fixed `AttributeError` in inventory API handlers; migrated to global error handling to avoid flask-smorest schema stripping.
+  - **Security & Consistency**: Removed legacy `require_token` decorator; standardized `actor_user_id` as integer.
+  - **Idempotency**: Added `client_event_id` to `StockReceiveRequestSchema`.
+  - **Tests**: Resolved 20+ test failures, including pre-existing JWT token identity and schema serialization issues.
+
+**How to Test**:
+- Run full test suite: `pytest backend/tests/ -v`.
+- All 81 tests should pass.
+
+**Ref**: TASK-0016
+
+---
+
 ### 2026-02-07 - Final Fixes (v2.1)
 **What**: Critical bug fixes for Consumables in Bulk Entry and Electron Security hardening.
 

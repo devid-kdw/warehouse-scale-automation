@@ -25,7 +25,7 @@ export default function Receiving() {
             order_number: '',
             note: '',
             // Hidden fields
-            location_id: 1 // Default to 1
+            location_id: 13 // Default location (warehouse 13)
         },
         validate: {
             article_id: (val) => !val ? 'Article is required' : null,

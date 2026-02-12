@@ -44,46 +44,24 @@ class ApproveDraft(MethodView):
         
         Creates transaction records for audit trail.
         """
-        try:
-            # Get actor from JWT instead of request body (JWT identity is string, convert to int)
-            actor_user_id = int(get_jwt_identity())
-            
-            result = approve_draft(
-                draft_id=draft_id,
-                actor_user_id=actor_user_id,
-                note=approval_data.get('note')
-            )
-            db.session.commit()
-            
-            return {
-                'message': 'Draft approved successfully',
-                'draft_id': result['draft_id'],
-                'new_status': result['new_status'],
-                'consumed_surplus_kg': result['consumed_surplus_kg'],
-                'consumed_stock_kg': result['consumed_stock_kg'],
-                'action': result['approval_action']
-            }
-            
-        except InsufficientStockError as e:
-            db.session.rollback()
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, 409
-            
-        except AppError as e:
-            db.session.rollback()
-            status_code = 404 if 'NOT_FOUND' in e.code else 409
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, status_code
+        # Get actor from JWT instead of request body (JWT identity is string, convert to int)
+        actor_user_id = int(get_jwt_identity())
+        
+        result = approve_draft(
+            draft_id=draft_id,
+            actor_user_id=actor_user_id,
+            note=approval_data.get('note')
+        )
+        db.session.commit()
+        
+        return {
+            'message': 'Draft approved successfully',
+            'draft_id': result['draft_id'],
+            'new_status': result['new_status'],
+            'consumed_surplus_kg': result['consumed_surplus_kg'],
+            'consumed_stock_kg': result['consumed_stock_kg'],
+            'action': result['approval_action']
+        }
 
 
 @blp.route('/<int:draft_id>/reject')
@@ -106,31 +84,19 @@ class RejectDraft(MethodView):
         Requires ADMIN role. Actor is determined from JWT token.
         No inventory changes occur on rejection.
         """
-        try:
-            # Get actor from JWT instead of request body (JWT identity is string, convert to int)
-            actor_user_id = int(get_jwt_identity())
-            
-            result = reject_draft(
-                draft_id=draft_id,
-                actor_user_id=actor_user_id,
-                note=approval_data.get('note')
-            )
-            db.session.commit()
-            
-            return {
-                'message': 'Draft rejected successfully',
-                'draft_id': result['draft_id'],
-                'new_status': result['new_status'],
-                'action': result.get('approval_action')  # Already a dict
-            }
-            
-        except AppError as e:
-            db.session.rollback()
-            status_code = 404 if 'NOT_FOUND' in e.code else 409
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, status_code
+        # Get actor from JWT instead of request body (JWT identity is string, convert to int)
+        actor_user_id = int(get_jwt_identity())
+        
+        result = reject_draft(
+            draft_id=draft_id,
+            actor_user_id=actor_user_id,
+            note=approval_data.get('note')
+        )
+        db.session.commit()
+        
+        return {
+            'message': 'Draft rejected successfully',
+            'draft_id': result['draft_id'],
+            'new_status': result['new_status'],
+            'action': result.get('approval_action')  # Already a dict
+        }

@@ -36,6 +36,7 @@ export default function ReceiptHistory() {
                             <Table.Th>Article</Table.Th>
                             <Table.Th>Description</Table.Th>
                             <Table.Th>Batch</Table.Th>
+                            <Table.Th>Received By</Table.Th>
                             <Table.Th align="right">Qty (kg)</Table.Th>
                         </Table.Tr>
                     </Table.Thead>
@@ -49,6 +50,7 @@ export default function ReceiptHistory() {
                                         {line.batch_code}
                                     </Badge>
                                 </Table.Td>
+                                <Table.Td>{line.user_name || '-'}</Table.Td>
                                 <Table.Td fw={700} align="right">{line.quantity_kg.toFixed(2)}</Table.Td>
                             </Table.Tr>
                         ))}

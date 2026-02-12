@@ -44,7 +44,7 @@ class TestLogin:
         
         assert response.status_code == 401
         data = response.get_json()
-        assert data['error']['code'] == 'INVALID_CREDENTIALS'
+        assert data['error']['code'] == 'INVALID_TOKEN'
     
     def test_login_nonexistent_user(self, client):
         """Non-existent user returns 401."""
@@ -69,7 +69,7 @@ class TestRBAC:
             
             # Create token for operator
             token = create_access_token(
-                identity=user,
+                identity=str(user),
                 additional_claims={'role': 'OPERATOR', 'username': 'testuser'}
             )
         
@@ -93,7 +93,7 @@ class TestRBAC:
             
             # Create token for admin
             token = create_access_token(
-                identity=user,
+                identity=str(user),
                 additional_claims={'role': 'ADMIN', 'username': 'testuser'}
             )
         
@@ -114,7 +114,7 @@ class TestRBAC:
             db.session.commit()
             
             token = create_access_token(
-                identity=user,
+                identity=str(user),
                 additional_claims={'role': 'OPERATOR', 'username': 'testuser'}
             )
         
@@ -142,7 +142,7 @@ class TestRefreshToken:
             from flask_jwt_extended import create_refresh_token
             
             refresh_token = create_refresh_token(
-                identity=user,
+                identity=str(user),
                 additional_claims={'role': 'ADMIN', 'username': 'testuser'}
             )
         

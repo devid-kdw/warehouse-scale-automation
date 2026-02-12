@@ -1,6 +1,6 @@
 """Authentication module - JWT authentication and RBAC."""
 from functools import wraps
-from flask import current_app
+from flask import current_app, abort, jsonify
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -121,28 +121,16 @@ def require_roles(*allowed_roles):
             user_role = claims.get('role')
             
             if user_role not in allowed_roles:
-                return {
+                response = jsonify({
                     'error': {
                         'code': 'FORBIDDEN',
                         'message': f'Access denied. Required roles: {", ".join(allowed_roles)}',
                         'details': {'user_role': user_role, 'required_roles': list(allowed_roles)}
                     }
-                }, 403
+                })
+                response.status_code = 403
+                abort(response)
             
             return f(*args, **kwargs)
         return decorated_function
     return decorator
-
-
-# Legacy decorator for backward compatibility during transition
-def require_token(f):
-    """Legacy token decorator - now wraps jwt_required.
-    
-    This maintains backward compatibility during migration.
-    Will be removed in future version.
-    """
-    @wraps(f)
-    @jwt_required()
-    def decorated(*args, **kwargs):
-        return f(*args, **kwargs)
-    return decorated

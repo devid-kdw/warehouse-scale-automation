@@ -64,9 +64,9 @@ def client(app):
 
 @pytest.fixture
 def location(app):
-    """Create test location."""
+    """Create test location with id=13 (per RULES_OF_ENGAGEMENT)."""
     with app.app_context():
-        loc = Location(code='13', name='Test Warehouse')
+        loc = Location(id=13, code='13', name='Test Warehouse')
         db.session.add(loc)
         db.session.commit()
         loc_id = loc.id

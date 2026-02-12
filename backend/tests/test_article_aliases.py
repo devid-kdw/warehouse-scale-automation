@@ -6,7 +6,7 @@ from app.models import ArticleAlias
 
 
 def get_headers(user_id):
-    token = create_access_token(identity=user_id, additional_claims={'role': 'ADMIN'})
+    token = create_access_token(identity=str(user_id), additional_claims={'role': 'ADMIN'})
     return {'Authorization': f'Bearer {token}'}
 
 

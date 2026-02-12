@@ -297,23 +297,9 @@ class ArticleResolve(MethodView):
         """Find article by query string (article_no or alias)."""
         query = request.args.get('query')
         if not query:
-             return {
-                'error': {
-                    'code': 'VALIDATION_ERROR',
-                    'message': 'Query parameter is required',
-                }
-            }, 400
+            raise AppError('VALIDATION_ERROR', 'Query parameter is required')
             
-        try:
-            return article_alias_service.resolve_article(query)
-        except AppError as e:
-            return {
-                'error': {
-                    'code': e.error_code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, e.status_code
+        return article_alias_service.resolve_article(query)
 
 
 @blp.route('/<int:article_id>/aliases')
@@ -329,17 +315,8 @@ class ArticleAliases(MethodView):
     @require_roles('ADMIN')
     def get(self, article_id):
         """List aliases for an article."""
-        try:
-            aliases = article_alias_service.get_aliases(article_id)
-            return {'items': aliases, 'total': len(aliases)}
-        except AppError as e:
-            return {
-                'error': {
-                    'code': e.error_code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, e.status_code
+        aliases = article_alias_service.get_aliases(article_id)
+        return {'items': aliases, 'total': len(aliases)}
 
     @blp.doc(security=[{'bearerAuth': []}])
     @blp.arguments(AliasCreateSchema)
@@ -352,16 +329,7 @@ class ArticleAliases(MethodView):
     @require_roles('ADMIN')
     def post(self, alias_data, article_id):
         """Create a new alias for an article."""
-        try:
-            return article_alias_service.create_alias(article_id, alias_data['alias'])
-        except AppError as e:
-            return {
-                'error': {
-                    'code': e.error_code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, e.status_code
+        return article_alias_service.create_alias(article_id, alias_data['alias'])
 
 
 @blp.route('/<int:article_id>/aliases/<int:alias_id>')
@@ -377,14 +345,5 @@ class ArticleAliasDetail(MethodView):
     @require_roles('ADMIN')
     def delete(self, article_id, alias_id):
         """Delete an alias."""
-        try:
-            article_alias_service.delete_alias(alias_id)
-            return {'message': 'Alias deleted successfully'}
-        except AppError as e:
-            return {
-                'error': {
-                    'code': e.error_code,
-                    'message': e.message,
-                    'details': e.details
-                }
-            }, e.status_code
+        article_alias_service.delete_alias(alias_id)
+        return {'message': 'Alias deleted successfully'}

@@ -8,7 +8,7 @@ from app.models import Stock, Surplus, Transaction, WeighInDraft
 
 def get_headers(user_id):
     """Helper to get admin headers."""
-    token = create_access_token(identity=user_id, additional_claims={'role': 'ADMIN'})
+    token = create_access_token(identity=str(user_id), additional_claims={'role': 'ADMIN'})
     return {'Authorization': f'Bearer {token}'}
 
 

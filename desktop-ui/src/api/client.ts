@@ -58,11 +58,12 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 
     // Inject access token
     const token = getAccessToken();
-    console.log('[API Client] Request to:', config.url, 'Token present:', !!token, 'isPublic:', isPublicEndpoint);
+    if (import.meta.env.DEV) {
+        console.debug('[API Client]', config.method?.toUpperCase(), config.url);
+    }
 
     if (token && !isPublicEndpoint) {
         config.headers.Authorization = `Bearer ${token}`;
-        console.log('[API Client] Added Authorization header');
     }
 
     return config;

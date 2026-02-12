@@ -97,20 +97,6 @@ def create_group(
             rounding=ROUND_HALF_UP
         )
         
-        # 1. Resolve batch_id if missing (TASK-0015)
-        batch_id = line_data.get('batch_id')
-        if batch_id is None:
-            article = db.session.get(Article, line_data['article_id'])
-            if not article:
-                raise AppError('ARTICLE_NOT_FOUND', f"Article {line_data['article_id']} not found")
-            
-            if article.is_paint:
-                raise AppError('BATCH_REQUIRED', f"Batch ID is required for paint article {article.id}")
-            
-            # For consumables, use system NA batch
-            batch = batch_service.get_or_create_system_batch(article.id)
-            batch_id = batch.id
-
         draft = WeighInDraft(
             draft_group_id=group.id,
             location_id=location_id,

@@ -56,22 +56,12 @@ class Login(MethodView):
         
         Returns access_token (15 min) and refresh_token (30 days).
         """
-        try:
-            user = authenticate_user(
-                username=credentials['username'],
-                password=credentials['password']
-            )
-            tokens = create_tokens(user)
-            return tokens
-            
-        except AuthError as e:
-            return {
-                'error': {
-                    'code': e.code,
-                    'message': e.message,
-                    'details': {}
-                }
-            }, 401
+        user = authenticate_user(
+            username=credentials['username'],
+            password=credentials['password']
+        )
+        tokens = create_tokens(user)
+        return tokens
 
 
 @blp.route('/refresh')
