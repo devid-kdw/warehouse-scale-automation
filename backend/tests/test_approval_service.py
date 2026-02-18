@@ -19,10 +19,10 @@ class TestApproveWithSurplusOnly:
             result = approve_draft(draft, user)
             db.session.commit()
             
-            assert result['consumed_surplus_kg'] == 3.0
-            assert result['consumed_stock_kg'] == 0.0
-            assert result['remaining_surplus_kg'] == 2.0
-            assert result['remaining_stock_kg'] == 10.0
+            assert result['consumed_surplus'] == 3.0
+            assert result['consumed_stock'] == 0.0
+            assert result['remaining_surplus'] == 2.0
+            assert result['remaining_stock'] == 10.0
             assert result['new_status'] == 'APPROVED'
             
             # Verify database state
@@ -31,14 +31,14 @@ class TestApproveWithSurplusOnly:
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(surplus_obj.quantity_kg) == 2.0
+            assert float(surplus_obj.quantity) == 2.0
             
             stock_obj = Stock.query.filter_by(
                 location_id=location,
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(stock_obj.quantity_kg) == 10.0
+            assert float(stock_obj.quantity) == 10.0
             
             # Verify transactions
             txs = Transaction.query.filter_by(client_event_id='test-event-001').all()
@@ -59,7 +59,8 @@ class TestApproveWithSurplusAndStock:
                 location_id=location,
                 article_id=article,
                 batch_id=batch,
-                quantity_kg=Decimal('8.00'),
+                quantity=Decimal('8.00'),
+                uom='KG',
                 client_event_id='test-event-002',
                 created_by_user_id=user,
                 source='manual'
@@ -71,10 +72,10 @@ class TestApproveWithSurplusAndStock:
             db.session.commit()
             
             # Should use 5kg from surplus (all of it), 3kg from stock
-            assert result['consumed_surplus_kg'] == 5.0
-            assert result['consumed_stock_kg'] == 3.0
-            assert result['remaining_surplus_kg'] == 0.0
-            assert result['remaining_stock_kg'] == 7.0
+            assert result['consumed_surplus'] == 5.0
+            assert result['consumed_stock'] == 3.0
+            assert result['remaining_surplus'] == 0.0
+            assert result['remaining_stock'] == 7.0
             
             # Verify transactions
             txs = Transaction.query.filter_by(client_event_id='test-event-002').all()
@@ -95,7 +96,8 @@ class TestApproveInsufficientStock:
                 location_id=location,
                 article_id=article,
                 batch_id=batch,
-                quantity_kg=Decimal('20.00'),
+                quantity=Decimal('20.00'),
+                uom='KG',
                 client_event_id='test-event-003',
                 created_by_user_id=user,
                 source='manual'
@@ -108,10 +110,10 @@ class TestApproveInsufficientStock:
             
             error = exc_info.value
             assert error.code == 'INSUFFICIENT_STOCK'
-            assert error.details['required_kg'] == 20.0
-            assert error.details['available_stock_kg'] == 10.0
-            assert error.details['available_surplus_kg'] == 5.0
-            assert error.details['shortage_kg'] == 5.0
+            assert error.details['required'] == 20.0
+            assert error.details['available_stock'] == 10.0
+            assert error.details['available_surplus'] == 5.0
+            assert error.details['shortage'] == 5.0
             
             # Verify draft status unchanged
             db.session.rollback()
@@ -124,14 +126,14 @@ class TestApproveInsufficientStock:
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(surplus_obj.quantity_kg) == 5.0
+            assert float(surplus_obj.quantity) == 5.0
             
             stock_obj = Stock.query.filter_by(
                 location_id=location,
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(stock_obj.quantity_kg) == 10.0
+            assert float(stock_obj.quantity) == 10.0
 
 
 class TestApproveEdgeCases:
@@ -184,11 +186,11 @@ class TestRejectDraft:
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(surplus_obj.quantity_kg) == 5.0
+            assert float(surplus_obj.quantity) == 5.0
             
             stock_obj = Stock.query.filter_by(
                 location_id=location,
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(stock_obj.quantity_kg) == 10.0
+            assert float(stock_obj.quantity) == 10.0

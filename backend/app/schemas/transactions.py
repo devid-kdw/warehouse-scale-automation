@@ -10,7 +10,8 @@ class TransactionSchema(Schema):
     location_id = fields.Integer()
     article_id = fields.Integer()
     batch_id = fields.Integer()
-    quantity_kg = fields.Float()
+    quantity = fields.Float()
+    uom = fields.String()
     user_id = fields.Integer(allow_none=True)
     source = fields.String()
     client_event_id = fields.String(allow_none=True)
@@ -27,7 +28,7 @@ class TransactionQuerySchema(Schema):
     batch_id = fields.Integer(metadata={'description': 'Filter by batch ID'})
     location_id = fields.Integer(metadata={'description': 'Filter by location ID'})
     tx_type = fields.String(
-        validate=validate.OneOf(['WEIGH_IN', 'SURPLUS_CONSUMED', 'STOCK_CONSUMED', 'INVENTORY_ADJUSTMENT']),
+        validate=validate.OneOf(['WEIGH_IN', 'SURPLUS_CONSUMED', 'STOCK_CONSUMED', 'INVENTORY_ADJUSTMENT', 'STOCK_RECEIPT']),
         metadata={'description': 'Filter by transaction type'}
     )
     from_ = fields.DateTime(

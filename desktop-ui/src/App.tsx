@@ -3,19 +3,25 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppShell, Group, Text, Button, Menu } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { IconLogout, IconUser } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { Sidebar } from './components/Sidebar';
+import { LanguageSwitcher } from './components/LanguageSwitcher';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import DraftEntry from './pages/Drafts/DraftEntry';
 import DraftApproval from './pages/Drafts/DraftApproval';
-import Articles from './pages/Articles';
-import Batches from './pages/Batches';
+// import Articles from './pages/Articles'; // Decommissioned
 import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import Receiving from './pages/Receiving';
-import ReceiptHistory from './pages/Inventory/ReceiptHistory';
+import { IdentifikatorLookup } from './pages/Identifikator/Lookup';
+import { IdentifikatorAdminQueue } from './pages/Identifikator/AdminQueue';
+import OpenOrders from './pages/Orders/OpenOrders';
+import ClosedOrders from './pages/Orders/ClosedOrders';
+import OrderDetail from './pages/Orders/OrderDetail';
+import CreateOrder from './pages/Orders/CreateOrder';
 import logo from './assets/enikon-logo.jpg';
-import BulkDraftEntry from './pages/Drafts/BulkDraftEntry';
+import Izlaz from './pages/Entries/Izlaz';
 import { logout } from './api/auth';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
@@ -43,6 +49,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 // Admin-only route wrapper
 function RequireAdmin({ children }: { children: React.ReactNode }) {
     const auth = useAuth();
+    const { t } = useTranslation('common');
 
     if (!auth.isAuthenticated) {
         return <Navigate to="/login" replace />;
@@ -50,8 +57,8 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 
     if (auth.user?.role !== 'ADMIN') {
         notifications.show({
-            title: 'Access Denied',
-            message: 'You do not have permission to view this page.',
+            title: t('auth.accessDenied'),
+            message: t('auth.noPermission'),
             color: 'red',
         });
         return <Navigate to="/drafts/new" replace />;
@@ -62,6 +69,7 @@ function RequireAdmin({ children }: { children: React.ReactNode }) {
 
 function Layout() {
     const auth = useAuth();
+    const { t } = useTranslation('common');
 
     const handleLogout = () => {
         logout();
@@ -78,30 +86,33 @@ function Layout() {
                 <Group h="100%" px="md" justify="space-between">
                     <Group>
                         <img src={logo} alt="Enikon Aerospace" style={{ height: 40 }} />
-                        <Text c="white" fw={700} size="lg">Warehouse Ops</Text>
+                        <Text c="white" fw={700} size="lg">{t('app.title')}</Text>
                     </Group>
 
                     {auth.isAuthenticated && auth.user && (
-                        <Menu shadow="md" width={200}>
-                            <Menu.Target>
-                                <Button
-                                    variant="subtle"
-                                    color="gray"
-                                    leftSection={<IconUser size={16} />}
-                                >
-                                    {auth.user.username} ({auth.user.role})
-                                </Button>
-                            </Menu.Target>
-                            <Menu.Dropdown>
-                                <Menu.Item
-                                    leftSection={<IconLogout size={14} />}
-                                    onClick={handleLogout}
-                                    color="red"
-                                >
-                                    Logout
-                                </Menu.Item>
-                            </Menu.Dropdown>
-                        </Menu>
+                        <Group gap="xs">
+                            <LanguageSwitcher />
+                            <Menu shadow="md" width={200}>
+                                <Menu.Target>
+                                    <Button
+                                        variant="subtle"
+                                        color="gray"
+                                        leftSection={<IconUser size={16} />}
+                                    >
+                                        {auth.user.username} ({auth.user.role})
+                                    </Button>
+                                </Menu.Target>
+                                <Menu.Dropdown>
+                                    <Menu.Item
+                                        leftSection={<IconLogout size={14} />}
+                                        onClick={handleLogout}
+                                        color="red"
+                                    >
+                                        {t('user.logout')}
+                                    </Menu.Item>
+                                </Menu.Dropdown>
+                            </Menu>
+                        </Group>
                     )}
                 </Group>
             </AppShell.Header>
@@ -121,31 +132,48 @@ function Layout() {
                     <Route path="/drafts" element={
                         <RequireAdmin><DraftApproval /></RequireAdmin>
                     } />
-                    <Route path="/drafts/bulk" element={
-                        <RequireAdmin><BulkDraftEntry /></RequireAdmin>
+                    <Route path="/izlaz" element={
+                        <RequireAdmin><Izlaz /></RequireAdmin>
                     } />
-                    <Route path="/articles" element={
-                        <RequireAdmin><Articles /></RequireAdmin>
+
+                    {/* Orders Module */}
+                    <Route path="/orders/open" element={
+                        <RequireAdmin><OpenOrders /></RequireAdmin>
                     } />
-                    <Route path="/batches" element={
-                        <RequireAdmin><Batches /></RequireAdmin>
+                    <Route path="/orders/closed" element={
+                        <RequireAdmin><ClosedOrders /></RequireAdmin>
                     } />
+                    <Route path="/orders/new" element={
+                        <RequireAdmin><CreateOrder /></RequireAdmin>
+                    } />
+                    <Route path="/orders/:id" element={
+                        <RequireAdmin><OrderDetail /></RequireAdmin>
+                    } />
+
+                    {/* Articles route removed */}
+
                     <Route path="/inventory" element={
                         <RequireAuth><Inventory /></RequireAuth>
                     } />
                     <Route path="/receiving" element={
                         <RequireAdmin><Receiving /></RequireAdmin>
                     } />
-                    <Route path="/inventory/receipts" element={
-                        <RequireAdmin><ReceiptHistory /></RequireAdmin>
-                    } />
+
                     <Route path="/reports" element={
                         <RequireAdmin><Reports /></RequireAdmin>
                     } />
 
-                    {/* Settings - both */}
+                    {/* Identifikator */}
+                    <Route path="/identifikator" element={
+                        <RequireAuth><IdentifikatorLookup /></RequireAuth>
+                    } />
+                    <Route path="/identifikator/queue" element={
+                        <RequireAdmin><IdentifikatorAdminQueue /></RequireAdmin>
+                    } />
+
+                    {/* Settings - ADMIN only (T18/T19 RBAC fix) */}
                     <Route path="/settings" element={
-                        <RequireAuth><Settings /></RequireAuth>
+                        <RequireAdmin><Settings /></RequireAdmin>
                     } />
 
                     {/* Default redirect */}

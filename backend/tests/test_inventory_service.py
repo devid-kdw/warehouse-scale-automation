@@ -25,7 +25,8 @@ class TestInventoryAdjustSetMode:
                 batch_id=batch,
                 target='stock',
                 mode='set',
-                quantity_kg=100.00,
+                quantity=100.00,
+                uom='KG',
                 actor_user_id=user,
                 note='Initial stock setup'
             )
@@ -42,7 +43,7 @@ class TestInventoryAdjustSetMode:
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(stock.quantity_kg) == 100.0
+            assert float(stock.quantity) == 100.0
     
     def test_set_surplus_value(self, app, location, article, batch, user):
         """Set surplus to absolute value."""
@@ -57,7 +58,8 @@ class TestInventoryAdjustSetMode:
                 batch_id=batch,
                 target='surplus',
                 mode='set',
-                quantity_kg=25.50,
+                quantity=25.50,
+                uom='KG',
                 actor_user_id=user
             )
             db.session.commit()
@@ -69,7 +71,7 @@ class TestInventoryAdjustSetMode:
                 article_id=article,
                 batch_id=batch
             ).first()
-            assert float(surplus.quantity_kg) == 25.5
+            assert float(surplus.quantity) == 25.5
 
 
 class TestInventoryAdjustDeltaMode:
@@ -89,7 +91,8 @@ class TestInventoryAdjustDeltaMode:
                 batch_id=batch,
                 target='stock',
                 mode='delta',
-                quantity_kg=5.00,
+                quantity=5.00,
+                uom='KG',
                 actor_user_id=user
             )
             db.session.commit()
@@ -111,7 +114,8 @@ class TestInventoryAdjustDeltaMode:
                 batch_id=batch,
                 target='stock',
                 mode='delta',
-                quantity_kg=-3.00,
+                quantity=-3.00,
+                uom='KG',
                 actor_user_id=user
             )
             db.session.commit()
@@ -133,7 +137,8 @@ class TestInventoryAdjustDeltaMode:
                     batch_id=batch,
                     target='stock',
                     mode='delta',
-                    quantity_kg=-15.00,  # Would go to -5
+                    quantity=-15.00,  # Would go to -5
+                    uom='KG',
                     actor_user_id=user
                 )
             
@@ -158,12 +163,13 @@ class TestInventoryAdjustValidation:
                     batch_id=batch,
                     target='stock',
                     mode='set',
-                    quantity_kg=100.0,
+                    quantity=100.0,
+                    uom='KG',
                     actor_user_id=user
                 )
             
-            assert exc.value.code == 'VALIDATION_ERROR'
-            assert 'ADMIN' in exc.value.message
+            assert exc.value.code == 'FORBIDDEN'
+            assert 'Only ADMIN' in exc.value.message
     
     def test_creates_transaction(self, app, location, article, batch, user):
         """Adjustment creates transaction record."""
@@ -178,7 +184,8 @@ class TestInventoryAdjustValidation:
                 batch_id=batch,
                 target='stock',
                 mode='set',
-                quantity_kg=50.0,
+                quantity=50.0,
+                uom='KG',
                 actor_user_id=user,
                 note='Test adjustment'
             )
@@ -189,7 +196,7 @@ class TestInventoryAdjustValidation:
             ).first()
             
             assert tx is not None
-            assert float(tx.quantity_kg) == 50.0
+            assert float(tx.quantity) == 50.0
             assert tx.meta['target'] == 'stock'
             assert tx.meta['mode'] == 'set'
             assert tx.meta['note'] == 'Test adjustment'

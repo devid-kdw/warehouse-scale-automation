@@ -9,7 +9,7 @@ from ..extensions import db
 from ..auth import require_roles
 from ..models import Article, Batch, Stock, Surplus, Transaction, WeighInDraft, User
 from ..error_handling import AppError
-from ..schemas.articles import ArticleSchema, ArticleCreateSchema, ArticleListSchema
+from ..schemas.articles import ArticleSchema, ArticleCreateSchema, ArticleListSchema, ArticleUpdateSchema
 from ..schemas.aliases import ArticleAliasSchema, AliasCreateSchema, AliasListSchema
 from ..schemas.common import ErrorResponseSchema, SuccessMessageSchema
 from ..services import article_alias_service
@@ -95,6 +95,8 @@ class ArticleList(MethodView):
         """Create a new article.
         
         Creates an article with the provided data.
+        UOM is normalized to uppercase and persisted into UOM catalog.
+        If has_batch is not sent, it is derived from is_paint for backward compat.
         """
         # Check if article_no already exists
         existing = Article.query.filter_by(article_no=article_data['article_no']).first()
@@ -106,6 +108,16 @@ class ArticleList(MethodView):
                     'details': {'article_no': article_data['article_no']}
                 }
             }, 409
+        
+        # Normalize UOM to uppercase and persist in catalog
+        raw_uom = article_data['uom']
+        from ..services.uom_service import get_or_create_uom
+        uom_entry = get_or_create_uom(raw_uom)
+        article_data['uom'] = uom_entry.code
+        
+        # Backward compat: derive has_batch from is_paint when not sent
+        if article_data.get('has_batch') is None:
+            article_data['has_batch'] = article_data.get('is_paint', True)
         
         article = Article(**article_data)
         db.session.add(article)
@@ -282,6 +294,55 @@ class ArticleDelete(MethodView):
         }
 
 
+@blp.route('/id/<int:article_id>')
+class ArticleIDDetail(MethodView):
+    """Article by numeric ID resource."""
+    
+    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.response(200, ArticleSchema)
+    @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
+    @jwt_required()
+    def get(self, article_id):
+        """Get article by numeric ID."""
+        article = db.session.get(Article, article_id)
+        if not article:
+            return {
+                'error': {
+                    'code': 'ARTICLE_NOT_FOUND',
+                    'message': f'Article ID {article_id} not found'
+                }
+            }, 404
+        return article
+
+    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.arguments(ArticleUpdateSchema)
+    @blp.response(200, ArticleSchema)
+    @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
+    @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(403, schema=ErrorResponseSchema, description='Admin role required')
+    @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
+    @jwt_required()
+    @require_roles('ADMIN')
+    def patch(self, article_data, article_id):
+        """Update descriptive article fields (Admin only)."""
+        article = db.session.get(Article, article_id)
+        if not article:
+            return {
+                'error': {
+                    'code': 'ARTICLE_NOT_FOUND',
+                    'message': f'Article ID {article_id} not found'
+                }
+            }, 404
+            
+        for key, value in article_data.items():
+            setattr(article, key, value)
+            
+        article.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+        return article
+
+
 @blp.route('/resolve')
 class ArticleResolve(MethodView):
     """Resolve article by article_no or alias."""
@@ -292,7 +353,7 @@ class ArticleResolve(MethodView):
     @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
     @jwt_required()
-    @require_roles('ADMIN')
+    @require_roles('ADMIN', 'OPERATOR')
     def get(self):
         """Find article by query string (article_no or alias)."""
         query = request.args.get('query')

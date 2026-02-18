@@ -57,7 +57,9 @@ class ArticleBatchList(MethodView):
 class BatchList(MethodView):
     """Batch collection resource."""
     
-    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.doc(security=[{'bearerAuth': []}],
+             description='**DEPRECATED** — Use receiving workflow instead. '
+                         'Standalone batch creation will be removed in Phase 4.')
     @blp.arguments(BatchCreateSchema)
     @blp.response(201, BatchSchema)
     @blp.alt_response(400, schema=ErrorResponseSchema, description='Validation error')
@@ -68,8 +70,11 @@ class BatchList(MethodView):
     @jwt_required()
     @require_roles('ADMIN')
     def post(self, batch_data):
-        """Create a new batch.
-        
+        """Create a new batch (DEPRECATED).
+
+        **Deprecated**: Use the receiving workflow (`POST /api/inventory/receive`)
+        instead. This endpoint will be removed in Phase 4.
+
         Requires ADMIN role.
         Batch code must be 4-5 digits (Mankiewicz) or 9-12 digits (Akzo).
         """
@@ -104,5 +109,9 @@ class BatchList(MethodView):
         batch = Batch(**batch_data)
         db.session.add(batch)
         db.session.commit()
-        
-        return batch, 201
+
+        from flask import make_response
+        resp = make_response(BatchSchema().dump(batch), 201)
+        resp.headers['Deprecation'] = 'true'
+        resp.headers['Sunset'] = 'Mon, 01 Jun 2026 00:00:00 GMT'
+        return resp

@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Historical Snapshot Notice**
+> This task brief documents earlier implementation phases and may contain superseded assumptions.
+> Active direction is defined by:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 # TASK-0011: Frontend UI/UX Refinement (v2)
 
 **Goal**: Implement strict user controls, better input handling (Scale/Barcode), and data views according to updated specs.

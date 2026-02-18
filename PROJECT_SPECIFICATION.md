@@ -1,5 +1,14 @@
 # Warehouse Scale Automation - Project Specification v2.1
 
+> [!IMPORTANT]
+> This document is a baseline snapshot of an earlier implementation phase.
+> Current redesign/planning authority is:
+> 1. `docs/team/RULES_OF_ENGAGEMENT.md`
+> 2. `docs/team/DECISIONS.md`
+> 3. `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+>
+> If this file conflicts with those documents (e.g., KG-only assumptions, paint-coupled batch logic, legacy screen IA), follow the authority order above.
+
 ## 0. Overview
 
 Internal warehouse system for paint inventory (later: consumables) with emphasis on:

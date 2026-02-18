@@ -17,7 +17,7 @@ class TestDraftGroupService:
             lines = [{
                 'article_id': article,
                 'batch_id': batch,
-                'quantity_kg': 10.5,
+                'quantity': 10.5,
                 'client_event_id': 'evt-001',
                 'note': 'Single line test'
             }]
@@ -31,15 +31,15 @@ class TestDraftGroupService:
             
             assert group.name.startswith("OperatorDraft_") or "Draft_" in group.name
             assert len(group.drafts) == 1
-            assert group.drafts[0].quantity_kg == Decimal('10.50')
+            assert group.drafts[0].quantity == Decimal('10.50')
             assert group.status == 'DRAFT'
 
     def test_create_group_multi_line(self, app, location, article, batch, user):
         """Creating a multi-line group works."""
         with app.app_context():
             lines = [
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 5.0, 'client_event_id': 'evt-m1'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 3.0, 'client_event_id': 'evt-m2'}
+                {'article_id': article, 'batch_id': batch, 'quantity': 5.0, 'client_event_id': 'evt-m1'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 3.0, 'client_event_id': 'evt-m2'}
             ]
             
             group = draft_group_service.create_group(
@@ -52,18 +52,18 @@ class TestDraftGroupService:
             
             assert group.name == 'Batch Production A'
             assert len(group.drafts) == 2
-            assert group.total_quantity_kg == 8.0
+            assert group.total_quantity == 8.0
 
     def test_approve_group_atomic_success(self, app, location, article, batch, user):
         """Group approval succeeds atomically and updates inventory."""
         with app.app_context():
             # Prep stock: 10kg
-            s = Stock(location_id=location, article_id=article, batch_id=batch, quantity_kg=Decimal('10.00'))
+            s = Stock(location_id=location, article_id=article, batch_id=batch, quantity=Decimal('10.00'), uom='KG')
             db.session.add(s)
             
             lines = [
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 4.0, 'client_event_id': 'evt-ok1'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 4.0, 'client_event_id': 'evt-ok2'}
+                {'article_id': article, 'batch_id': batch, 'quantity': 4.0, 'client_event_id': 'evt-ok1'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 4.0, 'client_event_id': 'evt-ok2'}
             ]
             group = draft_group_service.create_group(location, user, lines)
             
@@ -74,19 +74,19 @@ class TestDraftGroupService:
             
             # Verify stock: 10 - 4 - 4 = 2
             stock_after = Stock.query.filter_by(location_id=location, article_id=article, batch_id=batch).one()
-            assert stock_after.quantity_kg == Decimal('2.00')
+            assert stock_after.quantity == Decimal('2.00')
 
     def test_approve_group_atomic_failure(self, app, location, article, batch, user):
         """If one line fails due to stock, the whole group remains DRAFT and no stock is changed."""
         with app.app_context():
             # Prep stock: 5kg
-            s = Stock(location_id=location, article_id=article, batch_id=batch, quantity_kg=Decimal('5.00'))
+            s = Stock(location_id=location, article_id=article, batch_id=batch, quantity=Decimal('5.00'), uom='KG')
             db.session.add(s)
             db.session.commit()
             
             lines = [
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 3.0, 'client_event_id': 'evt-fail1'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 3.0, 'client_event_id': 'evt-fail2'} # Total 6.0 > 5.0
+                {'article_id': article, 'batch_id': batch, 'quantity': 3.0, 'client_event_id': 'evt-fail1'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 3.0, 'client_event_id': 'evt-fail2'} # Total 6.0 > 5.0
             ]
             group = draft_group_service.create_group(location, user, lines)
             
@@ -102,12 +102,12 @@ class TestDraftGroupService:
             assert all(d.status == 'DRAFT' for d in group_reload.drafts)
             
             stock_reload = Stock.query.filter_by(location_id=location, article_id=article, batch_id=batch).one()
-            assert stock_reload.quantity_kg == Decimal('5.00')
+            assert stock_reload.quantity == Decimal('5.00')
 
     def test_reject_group_atomic(self, app, location, article, batch, user):
         """Rejecting a group updates all lines."""
         with app.app_context():
-            lines = [{'article_id': article, 'batch_id': batch, 'quantity_kg': 1.0, 'client_event_id': 'evt-rej'}]
+            lines = [{'article_id': article, 'batch_id': batch, 'quantity': 1.0, 'client_event_id': 'evt-rej'}]
             group = draft_group_service.create_group(location, user, lines)
             
             draft_group_service.reject_group(group.id, user)
@@ -119,13 +119,13 @@ class TestDraftGroupService:
         """Draft group correctly sums small decimals (0.01)."""
         with app.app_context():
             lines = [
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 0.01, 'client_event_id': 'evt-p1'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 0.01, 'client_event_id': 'evt-p2'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 0.01, 'client_event_id': 'evt-p3'}
+                {'article_id': article, 'batch_id': batch, 'quantity': 0.01, 'client_event_id': 'evt-p1'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 0.01, 'client_event_id': 'evt-p2'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 0.01, 'client_event_id': 'evt-p3'}
             ]
             group = draft_group_service.create_group(location, user, lines)
             # 0.01 + 0.01 + 0.01 = 0.03
-            assert group.total_quantity_kg == 0.03
+            assert group.total_quantity == 0.03
 
     def test_create_group_auto_name_pattern(self, app, location, user, article, batch):
         """Multi-line group without name gets auto-generated name."""
@@ -136,8 +136,8 @@ class TestDraftGroupService:
             db.session.commit()
             
             lines = [
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 1.0, 'client_event_id': 'auto-1'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 1.0, 'client_event_id': 'auto-2'}
+                {'article_id': article, 'batch_id': batch, 'quantity': 1.0, 'client_event_id': 'auto-1'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 1.0, 'client_event_id': 'auto-2'}
             ]
             
             # 1. First group
@@ -150,7 +150,7 @@ class TestDraftGroupService:
             assert group1.name == expected_name1
             
             # 2. Second group (counter increments)
-            lines2 = [{'article_id': article, 'batch_id': batch, 'quantity_kg': 1.0, 'client_event_id': 'auto-3'}] # Single line but check standard pattern if name missing? 
+            lines2 = [{'article_id': article, 'batch_id': batch, 'quantity': 1.0, 'client_event_id': 'auto-3'}]
             # Wait, single line logic has specific override if len=1 and no name -> AutoSingleDraft_...
             # The new logic says: if not name -> generate name.
             # But specific logic for single line was:
@@ -182,7 +182,7 @@ class TestDraftGroupAPI:
         """GET /api/draft-groups returns list."""
         with app.app_context():
             # Create a group via service first
-            draft_group_service.create_group(location, user, [{'article_id': article, 'batch_id': batch, 'quantity_kg': 1.0, 'client_event_id': 'evt-api-1'}])
+            draft_group_service.create_group(location, user, [{'article_id': article, 'batch_id': batch, 'quantity': 1.0, 'client_event_id': 'evt-api-1'}])
         
         # Get JWT for admin
         from flask_jwt_extended import create_access_token
@@ -196,7 +196,7 @@ class TestDraftGroupAPI:
         data = response.get_json()
         assert data['total'] >= 1
         assert 'line_count' in data['items'][0]
-        assert 'total_quantity_kg' in data['items'][0]
+        assert 'total_quantity' in data['items'][0]
 
     def test_post_group_with_lines(self, client, app, location, user, article, batch):
         """POST /api/draft-groups creates a group."""
@@ -208,8 +208,8 @@ class TestDraftGroupAPI:
             'location_id': location,
             'name': 'API Group',
             'lines': [
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 2.5, 'client_event_id': 'api-evt-1'},
-                {'article_id': article, 'batch_id': batch, 'quantity_kg': 1.5, 'client_event_id': 'api-evt-2'}
+                {'article_id': article, 'batch_id': batch, 'quantity': 2.5, 'client_event_id': 'api-evt-1'},
+                {'article_id': article, 'batch_id': batch, 'quantity': 1.5, 'client_event_id': 'api-evt-2'}
             ]
         }
         
@@ -220,7 +220,7 @@ class TestDraftGroupAPI:
         data = response.get_json()
         assert data['name'] == 'API Group'
         assert data['line_count'] == 2
-        assert data['total_quantity_kg'] == 4.0
+        assert data['total_quantity'] == 4.0
 
     def test_backward_compatibility_single_post(self, client, app, location, user, article, batch):
         """POST /api/drafts still works and creates an implicit group."""
@@ -232,7 +232,7 @@ class TestDraftGroupAPI:
             'location_id': location,
             'article_id': article,
             'batch_id': batch,
-            'quantity_kg': 7.77,
+            'quantity': 7.77,
             'client_event_id': 'legacy-evt-1'
         }
         
@@ -241,7 +241,7 @@ class TestDraftGroupAPI:
         
         assert response.status_code == 201
         data = response.get_json()
-        assert data['quantity_kg'] == 7.77
+        assert data['quantity'] == 7.77
         
         # Verify group exists in DB
         with app.app_context():
@@ -257,7 +257,7 @@ class TestDraftGroupAPI:
         with app.app_context():
             token = create_access_token(identity=str(user))
             # Create group
-            g = draft_group_service.create_group(location, user, [{'article_id': article, 'batch_id': batch, 'quantity_kg': 1.0, 'client_event_id': 'rn-1'}], name="OldName")
+            g = draft_group_service.create_group(location, user, [{'article_id': article, 'batch_id': batch, 'quantity': 1.0, 'client_event_id': 'rn-1'}], name="OldName")
             group_id = g.id
             
         headers = {'Authorization': f'Bearer {token}'}

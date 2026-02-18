@@ -124,10 +124,11 @@ def seed_command(demo):
                 location_id=location.id,
                 article_id=art1.id,
                 batch_id=batch1.id,
-                quantity_kg=Decimal('25.00')
+                quantity=Decimal('25.00'),
+                uom='KG'
             )
             db.session.add(stock1)
-            click.echo('  Created stock: 25.00kg for MNK-WHITE-5L batch 0044')
+            click.echo('  Created stock: 25.00 KG for MNK-WHITE-5L batch 0044')
         
         # Demo surplus for batch 1
         surplus1 = Surplus.query.filter_by(
@@ -140,11 +141,12 @@ def seed_command(demo):
                 location_id=location.id,
                 article_id=art1.id,
                 batch_id=batch1.id,
-                quantity_kg=Decimal('3.50'),
+                quantity=Decimal('3.50'),
+                uom='KG',
                 reason='Initial surplus from previous batch'
             )
             db.session.add(surplus1)
-            click.echo('  Created surplus: 3.50kg for MNK-WHITE-5L batch 0044')
+            click.echo('  Created surplus: 3.50 KG for MNK-WHITE-5L batch 0044')
         
         # Demo stock for batch 2
         stock2 = Stock.query.filter_by(
@@ -157,10 +159,11 @@ def seed_command(demo):
                 location_id=location.id,
                 article_id=art2.id,
                 batch_id=batch2.id,
-                quantity_kg=Decimal('50.00')
+                quantity=Decimal('50.00'),
+                uom='KG'
             )
             db.session.add(stock2)
-            click.echo('  Created stock: 50.00kg for AKZO-BLUE-10L batch 292456953')
+            click.echo('  Created stock: 50.00 KG for AKZO-BLUE-10L batch 292456953')
     
     db.session.commit()
     

@@ -13,6 +13,7 @@ def test_create_group_consumable_no_batch(client, app, user, location):
             description="Cleaning Cloths",
             uom="PCS",
             is_paint=False,
+            has_batch=False,
             is_active=True
         )
         db.session.add(article)
@@ -26,7 +27,7 @@ def test_create_group_consumable_no_batch(client, app, user, location):
         "name": "Consumable Group",
         "lines": [{
             "article_id": art_id,
-            "quantity_kg": 5.0,
+            "quantity": 5.0,
             "client_event_id": "evt-cons-1"
         }]
     }
@@ -70,7 +71,7 @@ def test_create_group_paint_no_batch_fails(client, app, user, location):
         "name": "Paint Group Fail",
         "lines": [{
             "article_id": art_id,
-            "quantity_kg": 10.0,
+            "quantity": 10.0,
             "client_event_id": "evt-pnt-fail"
         }]
     }

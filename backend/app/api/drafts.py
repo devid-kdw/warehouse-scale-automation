@@ -106,7 +106,8 @@ class DraftList(MethodView):
         line = {
             'article_id': draft_data['article_id'],
             'batch_id': draft_data['batch_id'],
-            'quantity_kg': draft_data['quantity_kg'],
+            'quantity': draft_data['quantity'],
+            'uom': draft_data.get('uom'),
             'draft_type': draft_data.get('draft_type', WeighInDraft.DRAFT_TYPE_WEIGH_IN),
             'client_event_id': draft_data['client_event_id'],
             'note': draft_data.get('note')
@@ -178,12 +179,12 @@ class DraftDetail(MethodView):
             }, 409
         
         # Update fields
-        if 'quantity_kg' in update_data:
-            quantity = Decimal(str(update_data['quantity_kg'])).quantize(
+        if 'quantity' in update_data:
+            quantity = Decimal(str(update_data['quantity'])).quantize(
                 Decimal('0.01'),
                 rounding=ROUND_HALF_UP
             )
-            draft.quantity_kg = quantity
+            draft.quantity = quantity
         
         if 'note' in update_data:
             draft.note = update_data['note']

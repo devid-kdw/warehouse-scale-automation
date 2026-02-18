@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Historical Snapshot Notice**
+> This status file is an archival report for a past point in time.
+> For current rules and active direction use:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 # Git Commit Commands (v2.1.1 Hotfix)
 
 Since `task.md` is an internal agent file, we only need to commit the actual project changes (Inventory Hotfix).

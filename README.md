@@ -1,83 +1,63 @@
-# Warehouse Scale Automation v1.1.0-beta
-![Status](https://img.shields.io/badge/Status-Stabilization-yellow)
+# Warehouse Scale Automation
 
-Internal warehouse system for paint inventory management with staging/approval workflow and audit trail.
+Internal warehouse operations system with controlled inventory flows, approval workflows, and audit trail.
+
+## Current Documentation Authority
+
+When documentation conflicts, use this order:
+1. `docs/team/RULES_OF_ENGAGEMENT.md`
+2. `docs/team/DECISIONS.md`
+3. active planning brief: `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+4. historical task/status documents
 
 ## Project Structure
 
-```
+```text
 warehouse-scale-automation/
-├── backend/          # Flask API server
-├── desktop-ui/       # Electron + React (future)
-└── docs/             # Documentation
-    ├── team/         # Team documentation (changelog, decisions, migrations)
-    ├── status/       # Weekly status reports
-    └── tasks/        # Task briefs
+├── backend/
+├── desktop-ui/
+├── docs/
+│   ├── team/
+│   ├── tasks/
+│   └── status/
+├── PROJECT_SPECIFICATION.md
+└── README.md
 ```
 
-## Documentation
+## Important Notes
 
-- **[Project Specification](./PROJECT_SPECIFICATION.md)** - Comprehensive technical specification
-- **[Development Setup](./docs/team/DEVELOPMENT_SETUP.md)** - Step-by-step setup guide with troubleshooting
-- **[Agent Instructions](./docs/team/AGENT_INSTRUCTIONS.md)** - Instructions for Frontend, Backend, and Testing agents
-- **[Orchestrator Handbook](./docs/team/ORCHESTRATOR.md)** - Operational guide for project lead
-- **[Changelog](./docs/team/CHANGELOG.md)** - All changes tracked with test instructions
-- **[Decisions](./docs/team/DECISIONS.md)** - Architectural and policy decisions
-- **[Migrations](./docs/team/MIGRATIONS.md)** - Database schema evolution
-- **[Release Checklist](./docs/team/RELEASE_CHECKLIST.md)** - Pre-release verification steps
-- **[Status Reports](./docs/status/)** - Weekly progress updates
-
-**For Testing Agent**:
-- **[Testing Agent Rules](./docs/team/TESTING_AGENT_RULES.md)** - Testing protocol and responsibilities
+- The product direction is currently in a redesign/planning alignment phase (TASK-0020).
+- Many old docs describe earlier implemented states and are kept for traceability.
+- Use `docs/team/CHANGELOG.md` for latest documentation and policy updates.
 
 ## Quick Start
 
-**For detailed setup instructions with troubleshooting**, see: **[Development Setup Guide](./docs/team/DEVELOPMENT_SETUP.md)**
-
-### Backend (Terminal 1)
-
+Backend:
 ```bash
 cd backend
 python3 -m venv venv
 source venv/bin/activate
 pip3 install -r requirements.txt
-cp .env.example .env
-# Edit .env with your settings
 flask db upgrade
 flask seed
 python3 run.py
 ```
 
-#### 🆘 Database Troubleshooting (Migration Mismatch)
-If you encounter migration errors (e.g., `alembic_version` mismatch):
-
-```bash
-# ⚠️ WARNING: This wipes the database!
-rm backend/warehouse.db  # If using SQLite
-# OR for PostgreSQL: DROP SCHEMA public CASCADE; CREATE SCHEMA public;
-
-# Then re-init:
-flask db upgrade
-flask seed
-```
-```
-
-Backend runs on: **http://localhost:5001**
-
-### Desktop UI (Terminal 2)
-
+Desktop UI:
 ```bash
 cd desktop-ui
 npm install
 npm run electron:dev
 ```
 
-## Tech Stack
+## Key Links
 
-- **Backend**: Python 3.11+, Flask, PostgreSQL
-- **Desktop UI**: Electron + React (later phases)
-- **API Docs**: OpenAPI/Swagger via flask-smorest
-
-## License
-
-Proprietary - Internal Use Only
+- `PROJECT_SPECIFICATION.md`
+- `docs/team/DEVELOPMENT_SETUP.md`
+- `docs/team/RULES_OF_ENGAGEMENT.md`
+- `docs/team/DECISIONS.md`
+- `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+- `docs/tasks/TASK-0021-v3-implementation-master-plan.md`
+- `docs/tasks/backend-agent-tasks/`
+- `docs/tasks/frontend-agent-tasks/`
+- `docs/team/CHANGELOG.md`

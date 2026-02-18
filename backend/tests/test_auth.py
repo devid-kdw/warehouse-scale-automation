@@ -125,7 +125,7 @@ class TestRBAC:
                 'location_id': location,
                 'article_id': article,
                 'batch_id': batch,
-                'quantity_kg': 5.0,
+                'quantity': 5.0,
                 'client_event_id': 'test-operator-draft-001'
             }
         )
@@ -171,7 +171,7 @@ class TestProtectedEndpoints:
     
     def test_reports_requires_auth(self, client):
         """Reports endpoint requires authentication."""
-        response = client.get('/api/reports/inventory')
+        response = client.get('/api/reports/inventurna')
         assert response.status_code == 401
 
 
@@ -191,7 +191,7 @@ class TestReportsRBAC:
             )
         
         response = client.get(
-            '/api/reports/inventory',
+            '/api/reports/inventurna',
             headers={'Authorization': f'Bearer {token}'}
         )
         assert response.status_code == 403

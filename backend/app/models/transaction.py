@@ -35,7 +35,11 @@ class Transaction(db.Model):
         db.ForeignKey('batches.id'),
         nullable=False
     )
-    quantity_kg = db.Column(db.Numeric(14, 2), nullable=False)
+    # quantity_kg removed (v3 decommission)
+    
+    # v3 unit-aware transition columns (Phase 4 Remediation: NOT NULL)
+    quantity = db.Column(db.Numeric(14, 3), nullable=False)
+    uom = db.Column(db.String(20), nullable=False)
     user_id = db.Column(
         db.Integer,
         db.ForeignKey('users.id'),
@@ -45,8 +49,11 @@ class Transaction(db.Model):
     client_event_id = db.Column(db.Text, nullable=True, index=True)
     meta = db.Column(db.JSON, nullable=True)
     
-    # New fields for TASK-0010
+    # TASK-0010 fields
     order_number = db.Column(db.String(50), nullable=True)
+    # v3 receiving linkage (Phase 2 will require these)
+    delivery_note_number = db.Column(db.String(100), nullable=True)
+    order_line_id = db.Column(db.Integer, nullable=True)  # FK added in Phase 2 migration
     
     # Indexes
     __table_args__ = (
@@ -77,7 +84,7 @@ class Transaction(db.Model):
     VALID_TX_TYPES = [TX_WEIGH_IN, TX_SURPLUS_CONSUMED, TX_STOCK_CONSUMED, TX_INVENTORY_ADJUSTMENT, TX_STOCK_RECEIPT]
     
     def __repr__(self):
-        return f'<Transaction {self.tx_type} {self.quantity_kg}kg>'
+        return f'<Transaction {self.tx_type} {self.quantity} {self.uom}>'
     
     def to_dict(self):
         return {
@@ -87,10 +94,13 @@ class Transaction(db.Model):
             'location_id': self.location_id,
             'article_id': self.article_id,
             'batch_id': self.batch_id,
-            'quantity_kg': float(self.quantity_kg) if self.quantity_kg else None,
+            'quantity': float(self.quantity) if self.quantity is not None else None,
+            'uom': self.uom,
             'user_id': self.user_id,
             'source': self.source,
             'client_event_id': self.client_event_id,
             'order_number': self.order_number,
+            'delivery_note_number': self.delivery_note_number,
+            'order_line_id': self.order_line_id,
             'meta': self.meta
         }

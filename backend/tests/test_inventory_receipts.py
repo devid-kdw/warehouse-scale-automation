@@ -55,32 +55,42 @@ class TestReceiptHistory:
             receive_stock(
                 article_id=article,
                 batch_code='1111',
-                quantity_kg=Decimal('10.00'),
+                quantity=Decimal('10.00'),
+                uom='KG',
                 expiry_date=date.today(),
                 actor_user_id=user,
                 order_number='PO-1',
-                client_event_id='evt-1'
+                delivery_note_number='DN-1',
+                client_event_id='evt-1',
+                note='Test 1'
             )
             
             # Receipt 2: Two items (same client_event_id)
             receive_stock(
                 article_id=article,
                 batch_code='2222',
-                quantity_kg=Decimal('20.00'),
+                quantity=Decimal('20.00'),
+                uom='KG',
                 expiry_date=date.today(),
                 actor_user_id=user,
                 order_number='PO-2',
-                client_event_id='evt-2'
+                delivery_note_number='DN-2',
+                client_event_id='evt-2',
+                note='Test 2'
             )
             receive_stock(
                 article_id=article2.id,
                 batch_code='3333',
-                quantity_kg=Decimal('30.00'),
+                quantity=Decimal('30.00'),
+                uom='KG',
                 expiry_date=date.today(),
                 actor_user_id=user,
                 order_number='PO-2',
-                client_event_id='evt-2'  # Same event ID
+                delivery_note_number='DN-2',
+                client_event_id='evt-2',  # Same event ID
+                note='Test 2 item 2'
             )
+
             db.session.commit()
             
         headers = {'Authorization': f'Bearer {user_token}'}
@@ -119,7 +129,8 @@ class TestReceiptHistory:
                 location_id=location,
                 article_id=article,
                 batch_id=b.id,
-                quantity_kg=Decimal('5.00'),
+                quantity=Decimal('5.00'),
+                uom='KG',
                 user_id=user,
                 source='legacy',
                 client_event_id=None # Legacy

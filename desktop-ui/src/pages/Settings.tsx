@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { TextInput, Button, Paper, Title, Container, Group, Text, Alert } from '@mantine/core';
 import { IconCheck, IconX, IconDatabase } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client';
 import { checkHealth, extractErrorMessage } from '../api/services';
 import { getBaseUrl, setBaseUrl } from '../api/auth';
 import { useMutation } from '@tanstack/react-query';
 
 export default function Settings() {
+    const { t } = useTranslation('common');
     const [baseUrlState, setBaseUrlState] = useState('');
 
-    // Load initial values
     useEffect(() => {
         setBaseUrlState(getBaseUrl());
     }, []);
@@ -23,15 +24,13 @@ export default function Settings() {
         mutationFn: async () => {
             saveSettings();
 
-            // 1. Check basic connectivity
             const health = await checkHealth();
 
-            // 2. Verify we're authenticated (a protected endpoint would fail without valid JWT)
             try {
                 await apiClient.get('/api/articles?limit=1');
             } catch (error) {
                 const msg = extractErrorMessage(error);
-                throw new Error(`Authentication failed: ${msg}`);
+                throw new Error(`Autentifikacija nije uspjela: ${msg}`);
             }
 
             return health;
@@ -41,15 +40,15 @@ export default function Settings() {
     return (
         <Container size="sm" py="xl">
             <Paper shadow="xs" p="xl" withBorder>
-                <Title order={2} mb="md">Connection Settings</Title>
+                <Title order={2} mb="md">{t('settings.title')}</Title>
 
                 <Text c="dimmed" size="sm" mb="lg">
-                    Configure the connection to the Warehouse Backend API.
+                    {t('settings.description')}
                 </Text>
 
                 <TextInput
-                    label="API Base URL"
-                    description="The URL where the backend is running (e.g. http://localhost:5001)"
+                    label={t('settings.apiBaseUrl')}
+                    description={t('settings.apiBaseUrlDesc')}
                     placeholder="http://localhost:5001"
                     value={baseUrlState}
                     onChange={(e) => setBaseUrlState(e.target.value)}
@@ -63,23 +62,23 @@ export default function Settings() {
                         loading={testConnectionMutation.isPending}
                         onClick={() => testConnectionMutation.mutate()}
                     >
-                        Save & Test Connection
+                        {t('settings.saveAndTest')}
                     </Button>
                 </Group>
 
                 {testConnectionMutation.isSuccess && (
-                    <Alert icon={<IconCheck size={16} />} title="Connected" color="green" mt="md">
-                        Successfully connected to <strong>{testConnectionMutation.data.environment}</strong> environment.
+                    <Alert icon={<IconCheck size={16} />} title={t('settings.connected')} color="green" mt="md">
+                        {t('settings.connectedMsg')} <strong>{testConnectionMutation.data.environment}</strong>.
                         <br />
-                        DB Status: {testConnectionMutation.data.database}
+                        {t('settings.dbStatus')}: {testConnectionMutation.data.database}
                     </Alert>
                 )}
 
                 {testConnectionMutation.isError && (
-                    <Alert icon={<IconX size={16} />} title="Connection Failed" color="red" mt="md">
-                        {testConnectionMutation.error instanceof Error ? testConnectionMutation.error.message : 'Unknown error'}
+                    <Alert icon={<IconX size={16} />} title={t('settings.connectionFailed')} color="red" mt="md">
+                        {testConnectionMutation.error instanceof Error ? testConnectionMutation.error.message : 'Nepoznata greška'}
                         <br />
-                        Please check if the backend is running and you are logged in.
+                        {t('settings.checkBackend')}
                     </Alert>
                 )}
 

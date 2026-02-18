@@ -1,204 +1,139 @@
 # Decision Log
 
-This document tracks all architectural and policy decisions for the Warehouse Scale Automation project.
-
-Format: **Date** | **Decision** | **Rationale** | **Implications**
+This document tracks architectural and policy decisions.
 
 ---
 
 ## Active Decisions
 
-### 2026-02-03 - Single Location Policy (v1.x)
-**Decision**: Location is fixed to ID=13 for all v1.x releases.
-
-**Rationale**: Simplifies implementation and UI. Multi-location support is not needed for initial warehouse deployment. Reduces complexity in inventory queries and draft creation.
-
+### 2026-02-03 - Single Location Policy (v1)
+**Decision**: Location is fixed to ID=13 in v1 workflows.  
 **Implications**:
-- UI does not show location selector (hardcoded)
-- API can accept `location_id` parameter for future compatibility
-- All seed data must create location with id=13
-- Backend validates location existence but assumes single location
+- UI does not expose location selector in v1.
+- API can still accept `location_id` for forward compatibility.
 
----
-
-### 2026-02-03 - Batch Expiry Required
-**Decision**: `expiry_date` is REQUIRED for all batches in paint domain.
-
-**Rationale**: Paint products have shelf life. Operating without expiry tracking leads to use of expired materials. Visual warnings (red/orange badges) are critical for warehouse safety.
-
-**Implications**:
-- Backend validation: 400 error if `expiry_date` is NULL on batch creation
-- Frontend: expiry date picker is required field (marked with *)
-- Receiving workflow must enforce expiry input
-- UI displays color-coded expiry warnings:
-  - 🔴 Red: Expired (`expiry_date < today`)
-  - 🟠 Orange: Expiring soon (`< 30 days`)
-  - ⚪ Gray: OK (`> 30 days`)
-
----
-
-### 2026-02-03 - Batch Expiry Mismatch Policy
-**Decision**: If a batch already exists with an expiry date, receiving with a different expiry date returns **409 CONFLICT** error.
-
-**Rationale**: Silently overwriting expiry dates can cause chaos. Same batch code should represent same physical batch with same expiry. Different expiry = different batch code.
-
-**Implications**:
-- Receiving API must validate expiry match when batch exists
-- Error response: `BATCH_EXPIRY_MISMATCH` with existing and provided expiry
-- Admin must explicitly handle mismatches (cannot be automatic)
-
----
-
-### 2026-02-03 - Inventory Count Shortage Handling
-**Decision**: When inventory count shows a shortage (counted < total):
-1. `surplus` is reset to 0
-2. Deficit creates a `WeighInDraft` with `draft_type=INVENTORY_SHORTAGE`
-3. Admin must approve the draft to reduce stock
-4. Stock never goes below 0 automatically
-
-**Rationale**: Ensures audit trail for all stock reductions. Prevents accidental negative inventory. Requires admin approval for discrepancies.
-
-**Implications**:
-- Shortage drafts go through approval workflow
-- Stock remains unchanged until draft approved
-- Transaction trail shows: count adjustment + shortage draft approval
-- UI must clearly indicate "pending shortage approval"
-
----
-
-### 2026-02-03 - Inventory Count Surplus Handling
-**Decision**: When inventory count shows surplus (counted > total):
-1. Difference is added to `surplus` table
-2. `stock` remains unchanged
-3. Transaction recorded as `INVENTORY_ADJUSTMENT` targeting surplus
-
-**Rationale**: Surplus represents overage that will be consumed first. Stock remains accurate to what was received. Surplus auto-consumes before stock in approval workflow.
-
-**Implications**:
-- No manual approval needed for surplus increase
-- Surplus visible in inventory summary
-- Next consumption will use surplus-first logic
-
----
-
-### 2026-02-03 - Role-Based Access Control (RBAC)
-**Decision**: Two roles with distinct permissions:
-- **OPERATOR**: Can only create drafts (weigh-in)
-- **ADMIN**: Full access (drafts, approvals, inventory, reports, batches, articles, receiving)
-
-**Rationale**: Separation of duties. Operators perform daily weighing tasks. Admins handle approvals, inventory management, and system configuration.
-
-**Implications**:
-- Frontend routes protected with `RequireAuth` and `RequireAdmin` wrappers
-- Backend endpoints decorated with `@require_roles('ADMIN')`
-- JWT tokens include `role` claim
-- Receiving workflow is ADMIN-only (operators cannot add stock)
-
----
-
-### 2026-02-12 - RBAC Clarification: OPERATOR Inventory View (Supersedes)
-**Decision**: OPERATOR can view inventory summary (`/api/inventory/summary`). OPERATOR cannot access reports or admin functions.
-
-**Supersedes**: 2026-02-03 RBAC entry which stated "OPERATOR can only create drafts" — this was inconsistent with the LOCKED Rule 12 table in `RULES_OF_ENGAGEMENT.md` which grants OPERATOR "View inventory ✅".
-
-**Updated permissions table**:
-- **OPERATOR**: Create drafts (weigh-in) + view inventory summary
-- **ADMIN**: Full access (drafts, approvals, inventory, reports, batches, articles, receiving)
-
-**Rationale**: Operators need to see current stock levels to make informed weighing decisions.
-
-**Implications**:
-- Frontend routes: `/inventory` accessible to OPERATOR
-- Backend: `/api/inventory/summary` allows `@require_roles('ADMIN', 'OPERATOR')`
-- Reports remain ADMIN-only
-- JWT tokens include `role` claim
-- Receiving workflow is ADMIN-only (operators cannot add stock)
-
-### 2026-02-03 - Receiving Increases STOCK Only
-**Decision**: Receiving workflow increases `stock.quantity_kg`, never `surplus`.
-
-**Rationale**: Surplus represents overage from inventory counts, not received goods. Stock is what was officially received. Clear separation prevents confusion.
-
-**Implications**:
-- `POST /api/inventory/receive` updates stock table only
-- Transaction type: `STOCK_RECEIPT` (not WEIGH_IN)
-- Operators have no access to receiving (ADMIN-only)
-
----
-
-### 2026-02-03 - Transaction History Default: 90 Days
-**Decision**: UI defaults to showing last 90 days of transactions. Backend allows unlimited range with query params.
-
-**Rationale**: Balance between usability and performance. Most operational queries look at recent history. Longer ranges available via date picker.
-
-**Implications**:
-- Frontend automatically sets `start_date = today - 90 days`
-- Backend `GET /api/reports/transactions` accepts optional `start_date` and `end_date`
-- Full history available but requires explicit date range selection
-
----
-
-### 2026-02-03 - Orchestration Documentation Structure
-**Decision**: Establish `docs/team/`, `docs/status/`, `docs/tasks/` structure with mandatory changelog, decision log, and status reports.
-
-**Rationale**: Clear project history and decision tracking. Enables Stefan to always know what changed, why, and what's next. Facilitates agent coordination.
-
-**Implications**:
-- All changes logged in `CHANGELOG.md`
-- All architectural decisions logged in `DECISIONS.md`
-- Weekly status reports in `docs/status/YYYY-MM-DD.md`
-- Task briefs in `docs/tasks/TASK-XXX-name.md`
-- Orchestrator responsible for maintaining these documents
-
----
-
----
-
-### 2026-02-04 - Inventory Count Business Rules (LOCKED)
-**Decision**: Standardized rules for inventory count discrepancies.
-
-**Rules**:
-1. **Overage (surplus)**: If counted > total, add difference to `surplus`. Stock remains unchanged.
-2. **Match**: No change.
-3. **Shortage (deficit)**: If counted < total:
-   - Surplus reset to 0
-   - Create `WeighInDraft` (type=INVENTORY_SHORTAGE) for the deficit amount
-   - Admin must approve draft to reduce `stock`
-4. **Stock Integrity**: Stock quantity never drops below 0 automatically.
-5. **Consumption Priority**: Surplus is always consumed before stock in approval workflows.
-
-**Rationale**: Prevents accidental stock destruction, ensures audit trail for losses (draft approval), and prioritizes consuming "found" material (surplus) first.
-
----
-
-### 2026-02-04 - Receiving Workflow Lockdown
-**Decision**: New stock can ONLY be added via the Receiving Workflow (`POST /api/inventory/receive`) or Initial Inventory Count.
-**Constraint**: "Draft Approve" workflow is STRICTLY for consumption/weigh-in. It never increases stock.
-
-**Rationale**: separation of concerns. Receiving is an admin/warehouse manager function with strict batch/expiry controls. Weighing is an operator function for consumption.
-
----
-
-### 2026-02-04 - Article Core Fields & UOM
-**Decision**: 
-- `uom` (KG/L) is REQUIRED and authoritative.
-- `base_uom` is DEPRECATED (kept for legacy compatibility only).
-- **Core Fields**: `article_no`, `description`, `uom`, `manufacturer`, `manufacturer_art_number`, `is_active`.
-
-**Rationale**: Enforces data quality. Prevents "unknown unit" errors in UI.
-
----
-
-### 2026-02-04 - JWT Security Policy
+### 2026-02-03 - Inventory Integrity Baseline
 **Decision**:
-- Access Token: 15 minutes
-- Refresh Token: 7 days
-- Production: Server MUST fail to start if `JWT_SECRET_KEY` is default or too short (<32 chars).
+- Surplus-first consumption is mandatory.
+- Stock cannot go negative.
+- Shortage from inventory count creates approval draft.
+- Surplus from inventory count is auto-added to surplus bucket.
 
-**Rationale**: Balance between security (short access token) and usability (weekly login). Hard failure in production prevents accidental insecure deployments.
+### 2026-02-03 - Receiving Boundary
+**Decision**: Receiving increases stock only (not surplus) and is ADMIN-only.
+
+### 2026-02-03 - Batch Expiry Mismatch
+**Decision**: Existing batch with different expiry on receive returns 409 (`BATCH_EXPIRY_MISMATCH`).
+
+### 2026-02-12 - RBAC Clarification: OPERATOR Inventory View
+**Decision**: OPERATOR can view inventory summary; reports/admin operations remain restricted.
+
+### 2026-02-17 - Croatian-First UI + i18n Direction
+**Decision**:
+- UI copy baseline is Croatian.
+- Code identifiers and API contracts stay in English.
+- i18n architecture must support `hr`, `en`, `de`, `hu`.
+
+### 2026-02-17 - Global Layout Width Direction
+**Decision**: Screen content areas should be widened (responsive) to reduce wasted space and improve input readability.
+
+### 2026-02-17 - Multi-Unit Semantics (Major Refactor Approved)
+**Decision**:
+- System direction is unit-aware quantities (not KG-only UX/contract semantics).
+- Existing `quantity_kg` data must be migrated without losing audit history.
+
+### 2026-02-17 - Batch Logic Generalization
+**Decision**:
+- Batch behavior is driven by article-level `has_batch`/`is_batch_tracked` semantics.
+- `is_paint` is no longer the rule trigger for required batch/expiry.
+
+### 2026-02-17 - Bulk Entry Domain Rename and Model Direction
+**Decision**:
+- `Bulk Entry` operationally becomes `Izlaz`.
+- Outbound reference requires dedicated system field (`receipt_number`) with migration/sequence.
+- Existing test data can be reset to simplify migration rollout.
+
+### 2026-02-17 - Receiving IA Consolidation
+**Decision**:
+- `Receipt History` standalone screen is removed.
+- Receipt history is embedded in `Ulaz robe`.
+
+### 2026-02-17 - Inventory Module Consolidation
+**Decision**:
+- `Inventory` becomes `Skladiste`/`Pregled artikala` UX.
+- Standalone `/articles` and `/batches` UIs are decommission targets.
+- Admin article functions migrate into inventory module.
+
+### 2026-02-17 - Reports Module Refactor
+**Decision**:
+- Reports module (`Izvjestaji`) shifts from raw transaction table focus to:
+  - `Inventurna lista`
+  - `Surplus lista`
+  - `Statistike`
+- Inventory list rows are `article + batch`.
+- Reorder yellow zone is defined as `threshold < qty <= threshold * 1.10`.
+
+### 2026-02-17 - Approvals Aggregation Rule
+**Decision**:
+- Daily aggregation allowed only for same `article + batch`.
+- Same article in different batches remains separate rows.
+
+### 2026-02-17 - Orders Module (Narudzbe) Approved
+**Decision**:
+- New module with sub-screens:
+  - `Otvorene narudzbe`
+  - `Ulaz robe`
+  - `Zatvorene narudzbe`
+- `Order` + `OrderLine` model is required.
+- `order_number` can be auto-generated or manual; both must be unique.
+- Per-line `delivery_date` is required business field.
+- Receiving line captures `delivery_note_number`; optional `order_line_id` linkage.
+- Receiving without order is allowed with explanatory note.
+- Order closes when all active lines are fulfilled.
+
+### 2026-02-17 - Article Identifikator Module Approved
+**Decision**:
+- New shared module for ADMIN + OPERATOR lookup by alias/text/code.
+- If no match exists, user can submit missing-article report.
+- Admin has queue to process reports (status workflow + notes).
+
+### 2026-02-17 - Implementation Clarifications (Owner Follow-up)
+**Decision**:
+- Language switcher (`hr/en/de/hu`) is included in current implementation wave.
+- Layout standardization is required across screens with reduced side gutters and wider content area.
+- Draft Entry keeps `scale` as first-load default.
+- UOM strategy is open entry + persistent catalog growth (new unit is saved and reusable).
+- Approvals day grouping: operational day is `Europe/Berlin`; timestamp storage remains UTC.
+- Pre-approval aggregate edits overwrite pending draft values; no correction transaction pre-approval.
+- Hardware identity schema should be standardized now (`scale_id`, `scanner_id`, `station_id`, `source_label`, extensible metadata).
+- Identifier report queue is hosted under Reports module (`Izvještaji`) as dedicated sub-view.
+- Identifier reports are deduplicated by normalized input and closed only by explicit admin close action.
+- Statistics v1 should include all proposed baseline options; avoid split lists by UOM.
+- Auto order number format is `ORD-xxxx` (numeric padded).
+
+### 2026-02-17 - Backend Contract Alignment After v3 Backend Wave
+**Decision**:
+- Frontend implementation must align to as-implemented backend contracts, not only planned contracts.
+- Canonical admin Identifikator routes are `/api/admin/identifikator/*`; legacy `/api/identifikator/admin/*` is temporary fallback.
+- Standalone batch creation and transaction-table report APIs remain deprecated fallback and are excluded from new UI flows.
+- Full `quantity_kg` removal is deferred to dedicated decommission/remediation task (`TASK-0026A`), while frontend uses unit-aware fields where available and compatibility mapping where necessary.
 
 ---
 
-## Deprecated/Superseded Decisions
+## Superseded / Deprecated Decisions
 
-_(None yet)_
+### Superseded by 2026-02-12 RBAC Clarification
+- 2026-02-03 statement: "OPERATOR can only create drafts".
+
+### Superseded by 2026-02-17 Batch Logic Generalization
+- Paint-coupled rule where non-paint always maps to system batch as universal behavior.
+
+### Planned Deprecation (Owner Decision 2026-02-17)
+- `POST /api/batches` standalone creation endpoint after migration to receiving-only batch creation flow.
+
+---
+
+## Notes
+
+- For implementation input and screen-by-screen business details, see:
+  - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`

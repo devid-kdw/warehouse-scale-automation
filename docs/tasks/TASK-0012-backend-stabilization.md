@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Historical Snapshot Notice**
+> This task brief documents earlier implementation phases and may contain superseded assumptions.
+> Active direction is defined by:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 # TASK-0012: Backend Stabilization (P0/P1)
 
 **Goal**: Ensure database models are exported, migrations are synced, and critical API functionality (Draft Groups) works end-to-end with Atomicity.

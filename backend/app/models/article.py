@@ -6,6 +6,22 @@ from ..extensions import db
 
 class Article(db.Model):
     """Article (product) model."""
+
+    # Approved category keys (EN) — see TASK-0020 S-005
+    VALID_CATEGORIES = [
+        'equipment_installations',
+        'safety_equipment',
+        'operational_supplies',
+        'spare_parts_small_parts',
+        'auxiliary_operating_materials',
+        'assembly_material',
+        'raw_material',
+        'packaging_material',
+        'goods_merchandise',
+        'maintenance_material',
+        'tools_small_equipment',
+        'accessories_small_machines',
+    ]
     
     __tablename__ = 'articles'
     
@@ -23,7 +39,14 @@ class Article(db.Model):
     manufacturer_art_number = db.Column(db.Text, nullable=True)  # Vendor code e.g., 34665.91B6.7.171
     reorder_threshold = db.Column(db.Numeric(14, 2), nullable=True)  # Future low stock alarm
     is_paint = db.Column(db.Boolean, default=True, nullable=False)
+    # v3 columns
+    has_batch = db.Column(db.Boolean, default=True, nullable=False)  # canonical batch-tracking flag
+    supplier_code = db.Column(db.String(50), nullable=True)  # SAP/ERP supplier code
+    category = db.Column(db.String(50), nullable=True)  # normalized category key
     is_active = db.Column(db.Boolean, default=True, nullable=False)
+    # v3 remediation
+    density = db.Column(db.Numeric(10, 4), nullable=False, default=1.0)
+    
     created_at = db.Column(
         db.DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
@@ -41,7 +64,6 @@ class Article(db.Model):
     
     def __repr__(self):
         return f'<Article {self.article_no}>'
-    
     def to_dict(self):
         return {
             'id': self.id,
@@ -57,6 +79,10 @@ class Article(db.Model):
             'manufacturer_art_number': self.manufacturer_art_number,
             'reorder_threshold': float(self.reorder_threshold) if self.reorder_threshold else None,
             'is_paint': self.is_paint,
+            'has_batch': self.has_batch,
+            'density': float(self.density),
+            'supplier_code': self.supplier_code,
+            'category': self.category,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

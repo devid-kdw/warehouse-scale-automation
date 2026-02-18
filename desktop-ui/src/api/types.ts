@@ -3,14 +3,63 @@ export interface Article {
     id: number;
     article_no: string;
     description: string;
-    is_paint: boolean;
-    is_active: boolean;
     // V1.2 Enhanced Fields
-    uom?: 'KG' | 'L';
+    uom?: string; // Changed from 'KG' | 'L' to string for backend compat
     manufacturer?: string;
     manufacturer_art_number?: string;
     reorder_threshold?: number;
-    created_at?: string;
+    is_paint: boolean;
+    is_active: boolean; // Added in Phase 4
+    aliases?: string[]; // Optional array of alias codes
+}
+
+/** Matches backend MissingArticleReportSchema */
+export interface MissingItemReport {
+    id: number;
+    reported_by_user_id: number;
+    location_id: number;
+    raw_input: string;          // P0 fix: was 'query', backend uses 'raw_input'
+    status: 'OPEN' | 'PENDING' | 'IN_REVIEW' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
+    resolved_article_id?: number | null;
+    admin_note?: string | null; // P0 fix: was 'resolution_note'
+    created_at: string;
+    resolved_at?: string | null;
+}
+
+/** Matches backend AdminReportUpdateSchema */
+export interface AdminReportUpdatePayload {
+    status: 'IN_REVIEW' | 'RESOLVED' | 'CLOSED' | 'REJECTED';
+    admin_note?: string | null;
+    resolved_article_id?: number | null;
+}
+
+/** @deprecated Use AdminReportUpdatePayload */
+export interface ResolveReportPayload {
+    action: 'ignore' | 'alias' | 'create';
+    alias_for_article_id?: number;
+    new_article_data?: Partial<Article>;
+    note?: string;
+}
+
+/** Matches backend DailyApprovalSummarySchema */
+export interface DailyApprovalSummary {
+    date: string;
+    location_id: number;
+    total_lines: number;
+    total_qty: number;
+}
+
+/** Matches backend DailyApprovalDetailSchema */
+export interface DailyApprovalDetail {
+    article_id: number;
+    article_no: string;
+    article_name: string;
+    batch_id: number;
+    batch_code: string;
+    location_id: number;
+    total_qty: number;
+    uom: string;
+    draft_ids: number[];
 }
 
 export interface Alias {
@@ -75,7 +124,9 @@ export interface InventoryItem {
     article_id: number;
     article_no: string;
     description?: string;
-    is_paint?: boolean; // Optional until backend TASK-0018 rollout
+    is_paint?: boolean;
+    uom?: string; // Phase 4
+    manufacturer?: string; // Phase 4
     batch_id: number;
     batch_code: string;
     expiry_date?: string;
@@ -137,7 +188,8 @@ export interface CreateDraftPayload {
     location_id: number;
     article_id: number;
     batch_id: number | null;
-    quantity_kg: number;
+    quantity: number; // Phase 3
+    uom?: string; // Phase 3
     client_event_id: string;
     source?: string;
 }
@@ -150,8 +202,8 @@ export interface ApprovalResponse {
     message: string;
     draft_id: number;
     new_status: string;
-    consumed_surplus_kg?: number;
-    consumed_stock_kg?: number;
+    consumed_surplus?: number;
+    consumed_stock?: number;
     action?: any;
 }
 
@@ -175,25 +227,32 @@ export interface InventoryCountPayload {
 export interface StockReceivePayload {
     location_id?: number; // Defaults to 13
     article_id: number;
-    batch_code: string;
-    quantity_kg: number;
-    expiry_date: string; // YYYY-MM-DD
-    order_number: string; // REQUIRED for TASK-0011
-    received_date?: string; // YYYY-MM-DD
-    note?: string;
+    delivery_note_number: string; // Required Phase 2
+    order_line_id?: number; // Optional Phase 2
+    quantity: number; // Phase 2: quantity instead of quantity_kg
+    uom: string; // Phase 2: KG or L
+    batch_code?: string; // Optional (conditional)
+    expiry_date?: string; // Optional (conditional)
+    note?: string; // Conditional
+    // Deprecated fields kept for compat if needed, but new flow uses above
+    quantity_kg?: number;
+    order_number?: string;
 }
 
 export interface ReceiptHistoryLine {
     article_no: string;
     description: string;
     batch_code: string;
-    quantity_kg: number;
+    quantity_kg: number; // Legacy field
+    quantity: number;    // Phase 2 field
+    uom: string;         // Phase 2 field
     user_name?: string;
 }
 
 export interface ReceiptHistoryGroup {
     receipt_key: string;
-    order_number: string;
+    delivery_note_number?: string; // Phase 2
+    order_number?: string;
     received_at: string;
     lines: ReceiptHistoryLine[];
 }
@@ -215,10 +274,12 @@ export interface StockReceiveResponse {
 export interface CreateDraftGroupPayload {
     location_id?: number; // Defaults to 13 on backend
     name?: string;
+    description?: string; // Phase 3
     lines: Array<{
         article_id: number;
         batch_id: number | null;
-        quantity_kg: number;
+        quantity: number; // Phase 3
+        uom?: string; // Phase 3
         note?: string;
         client_event_id: string;
     }>;

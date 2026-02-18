@@ -9,6 +9,9 @@ from .approvals import blp as approvals_blp
 from .reports import blp as reports_blp
 from .inventory import blp as inventory_blp
 from .transactions import blp as transactions_blp
+from .uom import blp as uom_blp
+from .orders import blp as orders_blp
+from .identifikator import blp as identifikator_blp, blp_admin as identifikator_admin_blp
 
 
 def register_blueprints(api):
@@ -23,3 +26,7 @@ def register_blueprints(api):
     api.register_blueprint(reports_blp)
     api.register_blueprint(inventory_blp)
     api.register_blueprint(transactions_blp)
+    api.register_blueprint(uom_blp)
+    api.register_blueprint(orders_blp)
+    api.register_blueprint(identifikator_blp)
+    api.register_blueprint(identifikator_admin_blp)

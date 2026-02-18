@@ -109,14 +109,15 @@ def batch(app, article):
 
 @pytest.fixture
 def stock(app, location, article, batch):
-    """Create test stock with 10kg."""
+    """Create test stock with 10 units."""
     from decimal import Decimal
     with app.app_context():
         s = Stock(
             location_id=location,
             article_id=article,
             batch_id=batch,
-            quantity_kg=Decimal('10.00')
+            quantity=Decimal('10.00'),
+            uom='KG'
         )
         db.session.add(s)
         db.session.commit()
@@ -126,14 +127,15 @@ def stock(app, location, article, batch):
 
 @pytest.fixture
 def surplus(app, location, article, batch):
-    """Create test surplus with 5kg."""
+    """Create test surplus with 5 units."""
     from decimal import Decimal
     with app.app_context():
         s = Surplus(
             location_id=location,
             article_id=article,
             batch_id=batch,
-            quantity_kg=Decimal('5.00')
+            quantity=Decimal('5.00'),
+            uom='KG'
         )
         db.session.add(s)
         db.session.commit()
@@ -143,14 +145,15 @@ def surplus(app, location, article, batch):
 
 @pytest.fixture
 def draft(app, location, article, batch, user):
-    """Create test draft for 3kg."""
+    """Create test draft for 3 units."""
     from decimal import Decimal
     with app.app_context():
         d = WeighInDraft(
             location_id=location,
             article_id=article,
             batch_id=batch,
-            quantity_kg=Decimal('3.00'),
+            quantity=Decimal('3.00'),
+            uom='KG',
             client_event_id='test-event-001',
             created_by_user_id=user,
             source='manual'
@@ -163,14 +166,15 @@ def draft(app, location, article, batch, user):
 
 @pytest.fixture
 def pending_draft(app, location, article, batch, user):
-    """Create pending draft for 5kg (for approval tests)."""
+    """Create pending draft for 5 units (for approval tests)."""
     from decimal import Decimal
     with app.app_context():
         d = WeighInDraft(
             location_id=location,
             article_id=article,
             batch_id=batch,
-            quantity_kg=Decimal('5.00'),
+            quantity=Decimal('5.00'),
+            uom='KG',
             client_event_id='test-pending-draft-001',
             created_by_user_id=user,
             source='manual',

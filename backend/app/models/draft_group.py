@@ -10,7 +10,9 @@ class DraftGroup(db.Model):
     __tablename__ = 'draft_groups'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.Text, nullable=True)
+    name = db.Column(db.Text, nullable=True) # Legacy alias for description/manual name
+    receipt_number = db.Column(db.String(50), unique=True, nullable=True) # Will be NOT NULL after migration backfill
+    description = db.Column(db.Text, nullable=True)
     status = db.Column(db.Text, nullable=False, default='DRAFT')
     source = db.Column(db.Text, nullable=False, default='ui_operator')
     location_id = db.Column(
@@ -33,6 +35,7 @@ class DraftGroup(db.Model):
     __table_args__ = (
         db.Index('idx_draft_groups_status_created_at', 'status', 'created_at'),
         db.Index('idx_draft_groups_source_created_at', 'source', 'created_at'),
+        db.Index('idx_draft_groups_receipt_number', 'receipt_number', unique=True),
     )
     
     # Relationships
@@ -63,19 +66,21 @@ class DraftGroup(db.Model):
         return len(self.drafts)
 
     @property
-    def total_quantity_kg(self):
-        """Total quantity of all drafts in group."""
-        return sum(float(d.quantity_kg) for d in self.drafts)
+    def total_quantity(self):
+        """Total quantity of all drafts in group (unit-aware)."""
+        return sum(float(d.quantity) for d in self.drafts)
 
     def to_dict(self):
         return {
             'id': self.id,
             'name': self.name,
+            'receipt_number': self.receipt_number,
+            'description': self.description,
             'status': self.status,
             'source': self.source,
             'location_id': self.location_id,
             'created_by_user_id': self.created_by_user_id,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'line_count': len(self.drafts),
-            'total_quantity_kg': self.total_quantity_kg
+            'total_quantity': self.total_quantity
         }

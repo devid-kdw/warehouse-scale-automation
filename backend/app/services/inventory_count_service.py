@@ -75,7 +75,8 @@ def perform_inventory_count(
             location_id=location_id,
             article_id=article_id,
             batch_id=batch_id,
-            quantity_kg=Decimal('0')
+            quantity=Decimal('0'),
+            uom=article.uom
         )
         db.session.add(stock)
         db.session.flush()
@@ -92,14 +93,15 @@ def perform_inventory_count(
             location_id=location_id,
             article_id=article_id,
             batch_id=batch_id,
-            quantity_kg=Decimal('0')
+            quantity=Decimal('0'),
+            uom=article.uom
         )
         db.session.add(surplus)
         db.session.flush()
     
     # Calculate current state
-    current_stock = Decimal(str(stock.quantity_kg))
-    current_surplus = Decimal(str(surplus.quantity_kg))
+    current_stock = Decimal(str(stock.quantity))
+    current_surplus = Decimal(str(surplus.quantity))
     current_total = current_stock + current_surplus
     
     transactions_created = []
@@ -124,7 +126,7 @@ def perform_inventory_count(
         delta = counted_qty - current_total
         
         # Add to surplus
-        surplus.quantity_kg = current_surplus + delta
+        surplus.quantity = current_surplus + delta
         surplus.updated_at = now
         
         # Create transaction
@@ -134,7 +136,8 @@ def perform_inventory_count(
             location_id=location_id,
             article_id=article_id,
             batch_id=batch_id,
-            quantity_kg=delta,
+            quantity=delta,
+            uom=article.uom,
             user_id=actor_user_id,
             source='inventory_count',
             client_event_id=client_event_id,
@@ -166,7 +169,8 @@ def perform_inventory_count(
                 location_id=location_id,
                 article_id=article_id,
                 batch_id=batch_id,
-                quantity_kg=-current_surplus,
+                quantity=-current_surplus,
+                uom=article.uom,
                 user_id=actor_user_id,
                 source='inventory_count',
                 client_event_id=f'{client_event_id}-surplus-reset',
@@ -179,7 +183,7 @@ def perform_inventory_count(
             db.session.add(tx_surplus_reset)
             transactions_created.append(tx_surplus_reset)
             
-            surplus.quantity_kg = Decimal('0')
+            surplus.quantity = Decimal('0')
             surplus.updated_at = now
             
             result['surplus_reset'] = float(current_surplus)
@@ -192,7 +196,8 @@ def perform_inventory_count(
             location_id=location_id,
             article_id=article_id,
             batch_id=batch_id,
-            quantity_kg=shortage,
+            quantity=shortage,
+            uom=article.uom,
             status=WeighInDraft.STATUS_DRAFT,
             draft_type=WeighInDraft.DRAFT_TYPE_INVENTORY_SHORTAGE,
             created_by_user_id=actor_user_id,

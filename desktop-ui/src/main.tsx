@@ -6,6 +6,8 @@ import App from './App';
 import '@mantine/core/styles.css';
 import '@mantine/notifications/styles.css';
 import '@mantine/dates/styles.css';
+import './styles/layout.css'; // Global layout tokens
+import './i18n'; // Initialize i18n before app renders
 
 import { theme } from './theme';
 

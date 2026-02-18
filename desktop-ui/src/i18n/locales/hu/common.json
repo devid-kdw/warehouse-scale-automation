@@ -1,0 +1,47 @@
+{
+    "app": {
+        "title": "Raktárkezelő",
+        "disconnected": "Kapcsolat megszakítva"
+    },
+    "nav": {
+        "drafts": "Automatikus bevitel",
+        "approvals": "Jóváhagyások",
+        "bulkEntry": "Tömeges bevitel",
+        "articles": "Cikkek",
+        "batches": "Tételek",
+        "inventory": "Készlet",
+        "receiving": "Áruátvétel",
+        "receiptHistory": "Bevételezési előzmények",
+        "reports": "Jelentések",
+        "settings": "Beállítások"
+    },
+    "user": {
+        "logout": "Kijelentkezés"
+    },
+    "role": {
+        "ADMIN": "Adminisztrátor",
+        "OPERATOR": "Operátor"
+    },
+    "common": {
+        "search": "Keresés név/kód/álnév alapján",
+        "cancel": "Mégse",
+        "save": "Mentés",
+        "delete": "Törlés",
+        "edit": "Szerkesztés",
+        "add": "Hozzáadás",
+        "submit": "Küldés",
+        "loading": "Betöltés...",
+        "error": "Hiba",
+        "success": "Siker"
+    },
+    "auth": {
+        "accessDenied": "Hozzáférés megtagadva",
+        "noPermission": "Nincs jogosultsága az oldal megtekintéséhez."
+    },
+    "language": {
+        "hr": "Hrvatski",
+        "en": "English",
+        "de": "Deutsch",
+        "hu": "Magyar"
+    }
+}

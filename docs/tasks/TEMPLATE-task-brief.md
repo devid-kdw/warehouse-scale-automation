@@ -1,175 +1,110 @@
-# Task Brief: TASK-XXX-Short-Name
+# Task Brief: TASK-XXXX-short-name
 
 **Created**: YYYY-MM-DD  
-**Assigned to**: [Frontend Agent | Backend Agent | Both]  
-**Status**: [Planning | In Progress | Testing | Done]  
-**Priority**: [P0-Critical | P1-High | P2-Medium | P3-Low]
+**Assigned to**: Frontend Agent | Backend Agent | Both  
+**Status**: Planning | In Progress | Testing | Done  
+**Priority**: P0 | P1 | P2 | P3
 
 ---
 
-## 🎯 Goal
+## Goal
 
-_(What does the user/business get from this feature? One clear sentence.)_
-
-Example: "Admin can receive new stock arrivals and automatically update inventory with proper audit trail."
+One-sentence business outcome.
 
 ---
 
-## 📋 Scope
+## Scope
 
 ### In Scope
-- Feature/component 1
-- Feature/component 2
-- Specific behavior X
+- ...
 
 ### Out of Scope
-- Thing that's NOT included in this task
-- Future enhancement Y
-- Related but separate feature Z
+- ...
 
 ---
 
-## 🔧 Technical Changes
+## Dependencies
 
-### Backend Changes (if applicable)
-
-#### API Endpoints
-- **New**: `POST /api/inventory/receive`
-  - Auth: ADMIN only
-  - Request: `{location_id, article_id, batch_code, quantity_kg, expiry_date, note}`
-  - Response: `{batch_id, quantity_received, new_stock_total, transaction}`
-  
-- **Modified**: (list if existing endpoints change)
-
-#### Database Changes
-- Migration needed: [Yes | No]
-- Tables affected: `stock`, `batches`, `transactions`
-- New transaction type: `STOCK_RECEIPT`
-
-#### Service Layer
-- New service function: `receive_stock()`
-- Modified services: (list if applicable)
-
-### Frontend Changes (if applicable)
-
-#### New Pages/Components
-- `ReceiveStock.tsx` - form for stock receiving
-- `ReceiveStockModal.tsx` - alternative modal implementation
-
-#### Modified Pages
-- (list existing pages that need updates)
-
-#### API Client
-- Add `receiveStock()` function to `src/api/services.ts`
-- Add types: `ReceiveStockPayload`, `ReceiveStockResponse`
+- Related docs/rules/decisions.
+- Required backend/frontend sequencing.
+- External blockers.
 
 ---
 
-## ✅ Acceptance Criteria
+## Technical Changes
 
-_(Clear, measurable criteria. Each item should be testable.)_
+### Backend
+- endpoints to add/modify,
+- schema/model changes,
+- migrations,
+- service logic updates,
+- validation/error handling changes.
 
-1. [ ] Admin can navigate to "Receive Stock" page
-2. [ ] Form validates: article required, batch code format, quantity > 0, expiry required
-3. [ ] Submitting form increases stock.quantity_kg for correct location/article/batch
-4. [ ] Transaction with type=STOCK_RECEIPT is created
-5. [ ] If batch exists with different expiry → 409 error with clear message
-6. [ ] Success notification shown, inventory view refreshes
-7. [ ] Operator role CANNOT access receive stock feature
+### Frontend
+- routes/pages/components,
+- forms and UX behavior,
+- RBAC visibility,
+- i18n keys/copy,
+- API integration/types.
 
 ---
 
-## 🧪 Test Plan
+## Acceptance Criteria
 
-### Manual Testing
+1. [ ] ...
+2. [ ] ...
+3. [ ] ...
 
-1. **Happy Path - New Batch**:
-   ```
-   1. Login as admin
-   2. Navigate to Receive Stock
-   3. Select article 800147
-   4. Enter batch code: 0607
-   5. Enter quantity: 8.00 kg
-   6. Enter expiry: 2026-06-15
-   7. Submit
-   Expected: Success, stock increased by 8.00, transaction recorded
-   ```
+Criteria must be testable and role-aware.
 
-2. **Expiry Mismatch**:
-   ```
-   1. Receive same batch (0607) with different expiry
-   Expected: 409 error, message shows existing expiry vs provided expiry
-   ```
+---
 
-3. **Validation**:
-   ```
-   1. Try to submit without expiry
-   Expected: Validation error "Expiry date is required"
-   
-   2. Try negative quantity
-   Expected: Validation error
-   ```
+## Test Plan
 
-4. **RBAC**:
-   ```
-   1. Login as operator
-   2. Try to access /receive route
-   Expected: Redirect to /drafts/new (no access)
-   ```
+### Manual
+1. ...
+2. ...
 
-### Automated Tests (if applicable)
-
+### Automated
 ```bash
-# Backend
-pytest backend/tests/test_receiving.py -v
+# backend
+pytest
 
-# Frontend
-npm test -- ReceiveStock.test.tsx
+# frontend
+npm run build
 ```
 
 ---
 
-## 🚀 Rollout Notes
+## Rollout / Migration Notes
 
-### Prerequisites
-- Database migration applied (if needed)
-- `STOCK_RECEIPT` transaction type added to backend
-- Admin role exists in users table
-
-### Deployment Steps
-1. Apply database migration: `flask db upgrade`
-2. Restart backend
-3. Deploy frontend
-4. Test manually with smoke test scenarios
-
-### Configuration
-- No new environment variables needed
-- (or list new .env vars if applicable)
-
-### Seed Data
-- Ensure location with code="13" exists
-- Ensure at least one ADMIN user exists
+- migration steps,
+- rollback notes,
+- compatibility considerations,
+- seed/test-data notes.
 
 ---
 
-## 📚 Related Documentation
+## Documentation Updates Required
 
-- [Receiving Spec Addendum](file:///Users/grzzi/.gemini/antigravity/brain/773ef5d2-4f66-4a78-8a70-e2251cebe334/receiving_spec_addendum.md)
-- [DECISIONS.md - Batch Expiry Rules](../team/DECISIONS.md#batch-expiry-mismatch-policy)
-- [CHANGELOG.md](../team/CHANGELOG.md)
-
----
-
-## 📝 Implementation Notes
-
-_(Space for agent to add notes during implementation)_
-
-- 
+- [ ] `docs/team/CHANGELOG.md`
+- [ ] `docs/team/MIGRATIONS.md` (if migration exists)
+- [ ] `docs/team/DECISIONS.md` (if policy changed)
+- [ ] other task docs affected
 
 ---
 
-**Status Updates**:
-- YYYY-MM-DD: Task created
-- YYYY-MM-DD: Backend implementation started
-- YYYY-MM-DD: Frontend implementation complete
-- YYYY-MM-DD: Testing complete, ready for review
+## References
+
+- `docs/team/RULES_OF_ENGAGEMENT.md`
+- `docs/team/DECISIONS.md`
+- `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md` (when redesign-related)
+
+---
+
+## Status Updates
+
+- YYYY-MM-DD: Task created.
+- YYYY-MM-DD: Backend started.
+- YYYY-MM-DD: Frontend started.
+- YYYY-MM-DD: Testing completed.

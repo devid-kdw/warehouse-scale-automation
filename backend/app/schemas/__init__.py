@@ -1,10 +1,34 @@
 """Schemas package."""
 from .common import ErrorResponseSchema, SuccessMessageSchema, PaginationSchema
-from .articles import ArticleSchema, ArticleCreateSchema, ArticleListSchema
+from .articles import ArticleSchema, ArticleCreateSchema, ArticleListSchema, ArticleUpdateSchema
 from .batches import BatchSchema, BatchCreateSchema, BatchListSchema
 from .drafts import DraftSchema, DraftCreateSchema, DraftUpdateSchema, DraftQuerySchema, DraftListSchema
 from .approvals import ApprovalActionSchema, ApprovalRequestSchema, ApprovalResponseSchema
-from .reports import InventoryReportSchema, TransactionReportSchema, ReportQuerySchema
+from .reports import (
+    InventurnaReportResponseSchema,
+    SurplusReportResponseSchema,
+    ConsumptionReportResponseSchema,
+    ReorderRiskReportResponseSchema,
+    TransactionReportSchema,
+    ReportQuerySchema
+)
+from .inventory import (
+    InventorySummaryResponseSchema,
+    InventorySummaryQuerySchema,
+    InventoryCountRequestSchema,
+    InventoryCountResponseSchema,
+    StockReceiveRequestSchema,
+    StockReceiveResponseSchema,
+    ConsolidatedInventoryQuerySchema,
+    ConsolidatedInventoryResponseSchema,
+    ArticleInspectResponseSchema
+)
+from .identifikator import (
+    ArticleLookupQuerySchema,
+    MissingArticleReportCreateSchema,
+    MissingArticleReportSchema,
+    AdminReportUpdateSchema
+)
 
 __all__ = [
     'ErrorResponseSchema',
@@ -13,6 +37,7 @@ __all__ = [
     'ArticleSchema',
     'ArticleCreateSchema',
     'ArticleListSchema',
+    'ArticleUpdateSchema',
     'BatchSchema',
     'BatchCreateSchema',
     'BatchListSchema',
@@ -24,7 +49,15 @@ __all__ = [
     'ApprovalActionSchema',
     'ApprovalRequestSchema',
     'ApprovalResponseSchema',
-    'InventoryReportSchema',
+    'InventurnaReportResponseSchema',
+    'SurplusReportResponseSchema',
+    'ConsumptionReportResponseSchema',
+    'ReorderRiskReportResponseSchema',
     'TransactionReportSchema',
     'ReportQuerySchema',
+    'ConsolidatedInventoryQuerySchema',
+    'ConsolidatedInventoryResponseSchema',
+    'ArticleInspectResponseSchema',
+    'MissingArticleReportSchema',
+    'AdminReportUpdateSchema'
 ]

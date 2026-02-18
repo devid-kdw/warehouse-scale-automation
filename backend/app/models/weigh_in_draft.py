@@ -29,7 +29,11 @@ class WeighInDraft(db.Model):
         db.ForeignKey('batches.id'),
         nullable=False
     )
-    quantity_kg = db.Column(db.Numeric(14, 2), nullable=False)
+    # quantity_kg removed (v3 decommission)
+    
+    # v3 unit-aware transition columns
+    quantity = db.Column(db.Numeric(14, 3), nullable=False, default=0)
+    uom = db.Column(db.String(20), nullable=False)
     status = db.Column(db.Text, nullable=False, default='DRAFT')
     created_by_user_id = db.Column(
         db.Integer,
@@ -40,6 +44,12 @@ class WeighInDraft(db.Model):
     client_event_id = db.Column(db.Text, nullable=False, unique=True)
     note = db.Column(db.Text, nullable=True)
     draft_type = db.Column(db.String(20), nullable=False, default='WEIGH_IN')  # WEIGH_IN or INVENTORY_SHORTAGE
+    # v3 hardware source identity fields
+    scale_id = db.Column(db.String(50), nullable=True)
+    scanner_id = db.Column(db.String(50), nullable=True)
+    station_id = db.Column(db.String(50), nullable=True)
+    source_label = db.Column(db.String(100), nullable=True)
+    source_meta = db.Column(db.JSON, nullable=True)
     draft_group_id = db.Column(
         db.Integer,
         db.ForeignKey('draft_groups.id', ondelete='RESTRICT'),
@@ -54,8 +64,8 @@ class WeighInDraft(db.Model):
     # Constraints
     __table_args__ = (
         db.CheckConstraint(
-            'quantity_kg > 0 AND quantity_kg <= 9999.99',
-            name='ck_draft_quantity_range'
+            'quantity > 0',
+            name='ck_draft_quantity_positive'
         ),
         db.Index('idx_weigh_in_drafts_group_id', 'draft_group_id'),
     )
@@ -88,7 +98,7 @@ class WeighInDraft(db.Model):
     VALID_DRAFT_TYPES = [DRAFT_TYPE_WEIGH_IN, DRAFT_TYPE_INVENTORY_SHORTAGE]
     
     def __repr__(self):
-        return f'<WeighInDraft {self.id} ({self.status})>'
+        return f'<WeighInDraft {self.id} {self.quantity} {self.uom} ({self.status})>'
     
     def to_dict(self):
         return {
@@ -96,7 +106,8 @@ class WeighInDraft(db.Model):
             'location_id': self.location_id,
             'article_id': self.article_id,
             'batch_id': self.batch_id,
-            'quantity_kg': float(self.quantity_kg) if self.quantity_kg else None,
+            'quantity': float(self.quantity) if self.quantity is not None else 0,
+            'uom': self.uom,
             'status': self.status,
             'draft_type': self.draft_type,
             'created_by_user_id': self.created_by_user_id,

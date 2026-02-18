@@ -7,9 +7,13 @@ from marshmallow import Schema, fields, validate
 from ..extensions import db
 from ..auth import require_roles
 from ..models import Stock, Surplus, Article, Batch, Location, Transaction, User
-from ..services.inventory_service import adjust_inventory
-from ..services import inventory_count_service
+from ..services.inventory_service import (
+    adjust_inventory, 
+    get_consolidated_inventory, 
+    get_article_details
+)
 from ..services.receiving_service import receive_stock
+from ..services import inventory_count_service
 from ..error_handling import AppError
 from ..schemas.common import ErrorResponseSchema
 from ..schemas.inventory import (
@@ -19,7 +23,10 @@ from ..schemas.inventory import (
     InventoryCountResponseSchema,
     StockReceiveRequestSchema,
     StockReceiveResponseSchema,
-    ReceiptHistoryResponseSchema
+    ReceiptHistoryResponseSchema,
+    ConsolidatedInventoryQuerySchema,
+    ConsolidatedInventoryResponseSchema,
+    ArticleInspectResponseSchema
 )
 
 blp = Blueprint(
@@ -28,6 +35,42 @@ blp = Blueprint(
     url_prefix='/api/inventory',
     description='Inventory management'
 )
+
+
+@blp.route('')
+class ConsolidatedInventory(MethodView):
+    """Consolidated Article+Batch list."""
+    
+    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.arguments(ConsolidatedInventoryQuerySchema, location='query')
+    @blp.response(200, ConsolidatedInventoryResponseSchema)
+    @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @jwt_required()
+    def get(self, args):
+        """Get consolidated Article+Batch list with filters."""
+        # Note: inventory_service.get_consolidated_inventory refactored to A+B
+        items = get_consolidated_inventory(
+            location_id=args['location_id'],
+            category=args.get('category'),
+            article_no=args.get('article_no'),
+            state_filter=args['state']
+        )
+        return {'items': items, 'total': len(items)}
+
+
+@blp.route('/<int:article_id>/inspect')
+class ArticleInspect(MethodView):
+    """Deep article inspection."""
+    
+    @blp.doc(security=[{'bearerAuth': []}])
+    @blp.response(200, ArticleInspectResponseSchema)
+    @blp.alt_response(401, schema=ErrorResponseSchema, description='Invalid token')
+    @blp.alt_response(404, schema=ErrorResponseSchema, description='Article not found')
+    @jwt_required()
+    def get(self, article_id):
+        """Get article detail with batch breakdown and activity dates."""
+        # location_id hardcoded to 13 for now as per system default
+        return get_article_details(article_id, 13)
 
 
 class InventoryAdjustSchema(Schema):
@@ -48,9 +91,13 @@ class InventoryAdjustSchema(Schema):
         validate=validate.OneOf(['set', 'delta']),
         metadata={'description': 'set = absolute value, delta = relative change'}
     )
-    quantity_kg = fields.Float(
+    quantity = fields.Float(
         required=True,
-        metadata={'description': 'Amount (must be >=0 for set, can be negative for delta)'}
+        metadata={'description': 'Amount in specified UOM (must be >=0 for set)'}
+    )
+    uom = fields.String(
+        required=True,
+        metadata={'description': 'Unit of Measure (KG, L, etc.)'}
     )
     note = fields.String(
         allow_none=True,
@@ -65,6 +112,7 @@ class InventoryAdjustResponseSchema(Schema):
     previous_value = fields.Float()
     new_value = fields.Float()
     delta = fields.Float()
+    uom = fields.String()
     location_id = fields.Integer()
     article_id = fields.Integer()
     batch_id = fields.Integer()
@@ -93,7 +141,7 @@ class InventoryAdjust(MethodView):
         
         Modes:
         - set: Set absolute value (must be >= 0)
-        - delta: Add/subtract from current value (result must be >= 0)
+        - delta: Add/subtract from current value
         
         Creates an INVENTORY_ADJUSTMENT transaction for audit trail.
         """
@@ -107,7 +155,8 @@ class InventoryAdjust(MethodView):
                 batch_id=data['batch_id'],
                 target=data['target'],
                 mode=data['mode'],
-                quantity_kg=data['quantity_kg'],
+                quantity=data['quantity'],
+                uom=data['uom'],
                 actor_user_id=actor_user_id,
                 note=data.get('note')
             )
@@ -225,8 +274,8 @@ class InventorySummary(MethodView):
         
         items = []
         for batch, article, stock, surplus in results:
-            stock_qty = float(stock.quantity_kg) if stock else 0.0
-            surplus_qty = float(surplus.quantity_kg) if surplus else 0.0
+            stock_qty = float(stock.quantity) if stock else 0.0
+            surplus_qty = float(surplus.quantity) if surplus else 0.0
             
             # Skip if 0 quantity and batch inactive?
             # User wants to see inventory.
@@ -251,9 +300,9 @@ class InventorySummary(MethodView):
                 'batch_id': batch.id,
                 'batch_code': batch.batch_code,
                 'expiry_date': batch.expiry_date.isoformat() if batch.expiry_date else None,
-                'stock_qty': float(stock_qty),
-                'surplus_qty': float(surplus_qty),
-                'total_qty': float(stock_qty) + float(surplus_qty),
+                'stock': float(stock_qty),
+                'surplus': float(surplus_qty),
+                'total': float(stock_qty) + float(surplus_qty),
                 'is_paint': article.is_paint,
                 'updated_at': updated_at.isoformat() if updated_at else None
             })
@@ -309,13 +358,11 @@ class InventoryReceive(MethodView):
     @jwt_required()
     @require_roles('ADMIN')
     def post(self, data):
-        """Receive stock (ADMIN only).
+        """Receive stock (ADMIN only, v3 unit-aware).
         
-        Creates or reuses batch, increases stock, creates STOCK_RECEIPT transaction.
-        
-        - If batch exists with different expiry_date: 409 BATCH_EXPIRY_MISMATCH
-        - If batch exists with NULL expiry: backfills expiry_date
-        - If batch doesn't exist: auto-creates with provided expiry_date
+        Accepts unit-aware quantity+uom (preferred) or legacy quantity_kg.
+        delivery_note_number is required. order_number is optional.
+        Ad-hoc receiving (no order_line_id) requires a note.
         """
         actor_user_id = int(get_jwt_identity())
         
@@ -323,10 +370,13 @@ class InventoryReceive(MethodView):
             result = receive_stock(
                 article_id=data['article_id'],
                 batch_code=data['batch_code'],
-                quantity_kg=data['quantity_kg'],
                 expiry_date=data['expiry_date'],
                 actor_user_id=actor_user_id,
-                order_number=data['order_number'],
+                delivery_note_number=data['delivery_note_number'],
+                quantity=data.get('quantity'),
+                uom=data.get('uom'),
+                order_number=data.get('order_number'),
+                order_line_id=data.get('order_line_id'),
                 location_id=data.get('location_id', 13),
                 received_date=data.get('received_date'),
                 note=data.get('note'),
@@ -408,7 +458,7 @@ class ReceiptHistory(MethodView):
             # Aggregate
             group = receipts_map[key]
             group['line_count'] += 1
-            group['total_quantity'] += float(tx.quantity_kg)
+            group['total_quantity'] += float(tx.quantity)
             
             # Add item detail
             group['lines'].append({
@@ -416,7 +466,8 @@ class ReceiptHistory(MethodView):
                 'article_no': article.article_no,
                 'description': article.description,
                 'batch_code': batch.batch_code,
-                'quantity_kg': float(tx.quantity_kg),
+                'quantity': float(tx.quantity),
+                'uom': tx.uom,
                 'user_name': user.username if user else 'Unknown'
             })
             

@@ -1,7 +1,7 @@
 
 import {
     Container, Paper, Title, Select, TextInput, NumberInput,
-    Button, Group, Stack, Alert, Textarea, Text
+    Button, Group, Stack, Textarea, Text, LoadingOverlay
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
@@ -9,48 +9,14 @@ import { notifications } from '@mantine/notifications';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IconCheck, IconX, IconPackageImport, IconInfoCircle } from '@tabler/icons-react';
 import dayjs from 'dayjs';
+import { useTranslation } from 'react-i18next';
 import { getArticles, receiveStock, extractErrorMessage, getBatchesByArticle } from '../../api/services';
-
+import { listOrders } from '../../api/orders';
+import { ReceiptHistoryList } from '../../components/ReceiptHistoryList';
 
 export default function Receiving() {
+    const { t } = useTranslation('common');
     const queryClient = useQueryClient();
-
-
-    const form = useForm({
-        initialValues: {
-            article_id: '',
-            batch_code: '',
-            quantity_kg: 0,
-            expiry_date: null as Date | null,
-            order_number: '',
-            note: '',
-            // Hidden fields
-            location_id: 13 // Default location (warehouse 13)
-        },
-        validate: {
-            article_id: (val) => !val ? 'Article is required' : null,
-            order_number: (val) => !val ? 'Order number is required' : (val.length > 50 ? 'Max 50 characters' : null),
-            batch_code: (val, values) => {
-                const article = articlesQuery.data?.find(a => a.value === values.article_id);
-                const isConsumable = article && article.is_paint === false;
-                if (isConsumable) return null;
-
-                if (!val) return 'Batch code is required';
-                if (!/^\d{4,5}$|^\d{9,12}$/.test(val)) {
-                    return 'Invalid format. Must be 4-5 (Mankiewicz) or 9-12 (Akzo) digits.';
-                }
-                return null;
-            },
-            quantity_kg: (val) => val <= 0 ? 'Quantity must be greater than 0' : null,
-            expiry_date: (val, values) => {
-                const article = articlesQuery.data?.find(a => a.value === values.article_id);
-                const isConsumable = article && article.is_paint === false;
-                if (isConsumable) return null;
-
-                return !val ? 'Expiry date is required' : null;
-            },
-        },
-    });
 
     // Fetch Articles
     const articlesQuery = useQuery({
@@ -60,179 +26,261 @@ export default function Receiving() {
             value: a.id.toString(),
             label: `${a.article_no} - ${a.description}`,
             article_no: a.article_no,
-            is_paint: a.is_paint
+            is_paint: a.is_paint,
+            // Fallback for has_batch if not yet in API response type locally
+            has_batch: (a as any).has_batch ?? (a.is_paint !== false)
         })),
     });
 
-    // Fetch Batches for selected article (for visual feedback)
+    // Fetch Orders for linking
+    const ordersQuery = useQuery({
+        queryKey: ['orders', 'OPEN'],
+        queryFn: () => listOrders('OPEN'),
+    });
+
+    const form = useForm({
+        initialValues: {
+            article_id: '',
+            delivery_note_number: '',
+            order_id: '', // Helper to filter lines
+            order_line_id: '',
+            batch_code: '',
+            quantity: 0,
+            uom: 'KG', // Default
+            expiry_date: null as Date | null,
+            note: '',
+            location_id: 13
+        },
+        validate: {
+            article_id: (val) => !val ? t('common.required') : null,
+            delivery_note_number: (val) => !val ? t('common.required') : null,
+            quantity: (val) => val <= 0 ? `${t('receiving.quantity')} > 0` : null,
+            uom: (val) => (val !== 'KG' && val !== 'L') ? t('receiving.unsupportedUom', { uom: val }) : null,
+            note: (val, values) => (!values.order_line_id && !val) ? t('receiving.adHocNote') : null,
+            batch_code: (val, values) => {
+                const article = articlesQuery.data?.find(a => a.value === values.article_id);
+                const hasBatch = article?.has_batch;
+
+                if (!hasBatch) return null;
+                if (!val) return t('common.required');
+                if (!/^\d{4,5}$|^\d{9,12}$/.test(val)) {
+                    return 'Invalid format (4-5 or 9-12 digits)';
+                }
+                return null;
+            },
+            expiry_date: (val, values) => {
+                const article = articlesQuery.data?.find(a => a.value === values.article_id);
+                const hasBatch = article?.has_batch;
+                if (!hasBatch) return null;
+                return !val ? t('common.required') : null;
+            },
+        },
+    });
+
+    const selectedArticle = articlesQuery.data?.find(a => a.value === form.values.article_id);
+    const hasBatch = selectedArticle?.has_batch;
+
+    // Fetch Batches for visual feedback
     const batchesQuery = useQuery({
         queryKey: ['batches', form.values.article_id],
         queryFn: () => {
-            const article = articlesQuery.data?.find(a => a.value === form.values.article_id);
-            return article ? getBatchesByArticle(article.article_no) : { items: [], total: 0 };
+            if (!selectedArticle) return { items: [], total: 0 };
+            return getBatchesByArticle(selectedArticle.article_no);
         },
-        enabled: !!form.values.article_id,
+        enabled: !!form.values.article_id && !!hasBatch,
     });
 
-    // Batch Status Logic
     const existingBatch = batchesQuery.data?.items.find(b => b.batch_code === form.values.batch_code);
-    const isNewBatch = form.values.batch_code.length >= 4 && !existingBatch;
+    const isNewBatch = form.values.batch_code.length >= 4 && !existingBatch && hasBatch;
 
-    const selectedArticle = articlesQuery.data?.find(a => a.value === form.values.article_id);
-    const isConsumable = selectedArticle && selectedArticle.is_paint === false;
+    const orderOptions = ordersQuery.data?.items.map(o => ({
+        value: o.id.toString(),
+        label: `${o.order_number} - ${o.supplier_name || 'Unknown'}`
+    })) || [];
 
-    // Receive Mutation
+    const selectedOrder = ordersQuery.data?.items.find(o => o.id.toString() === form.values.order_id);
+    const lineOptions = selectedOrder?.lines
+        .filter(l => l.status === 'OPEN')
+        .map(l => ({
+            value: l.id.toString(),
+            label: `${l.article_no} - ${l.ordered_qty} ${l.uom} (Recv: ${l.received_qty})`
+        })) || [];
+
     const mutation = useMutation({
         mutationFn: (values: typeof form.values) => {
             return receiveStock({
                 article_id: parseInt(values.article_id),
-                batch_code: isConsumable ? "NA" : values.batch_code,
-                quantity_kg: values.quantity_kg,
-                expiry_date: isConsumable
-                    ? "2099-12-31"
-                    : (values.expiry_date ? dayjs(values.expiry_date).format('YYYY-MM-DD') : ''),
-                order_number: values.order_number,
+                delivery_note_number: values.delivery_note_number,
+                order_line_id: values.order_line_id ? parseInt(values.order_line_id) : undefined,
+                quantity: values.quantity,
+                uom: values.uom,
+                batch_code: hasBatch ? values.batch_code : undefined,
+                expiry_date: (hasBatch && values.expiry_date)
+                    ? dayjs(values.expiry_date).format('YYYY-MM-DD')
+                    : undefined,
                 note: values.note,
                 location_id: values.location_id
             });
         },
         onSuccess: (data) => {
+            const qty = data.quantity_received || form.values.quantity; // Fallback if API hasn't updated response type locally
             notifications.show({
-                title: 'Stock Received',
-                message: `Received ${data.quantity_received}kg. ${data.batch_created ? 'New Batch created.' : 'Existing Batch updated.'}`,
+                title: t('common.success'),
+                message: `${t('receiving.receiveStock')} OK: ${qty} ${form.values.uom}`,
                 color: 'green',
                 icon: <IconCheck size={16} />,
-                autoClose: 5000,
             });
 
-            // Invalidate queries
             queryClient.invalidateQueries({ queryKey: ['inventorySummary'] });
-            queryClient.invalidateQueries({ queryKey: ['transactions'] });
-            queryClient.invalidateQueries({ queryKey: ['batches'] });
+            queryClient.invalidateQueries({ queryKey: ['receiptHistory'] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
 
-            // Reset form but KEEP Article
+            // Invalidate batches if we created one
+            if (hasBatch) {
+                queryClient.invalidateQueries({ queryKey: ['batches'] });
+            }
+
+            form.setFieldValue('quantity', 0);
             form.setFieldValue('batch_code', '');
-            form.setFieldValue('quantity_kg', 0);
             form.setFieldValue('expiry_date', null);
-            form.setFieldValue('order_number', '');
             form.setFieldValue('note', '');
-            // article_id remains set
         },
         onError: (err: any) => {
-            // Check for specific error codes if needed, e.g. BATCH_EXPIRY_MISMATCH
-            // The extractErrorMessage helper usually handles details
             notifications.show({
-                title: 'Receive Failed',
+                title: t('common.error'),
                 message: extractErrorMessage(err),
                 color: 'red',
                 icon: <IconX size={16} />,
-                autoClose: 10000,
             });
         }
     });
 
     return (
-        <Container size="sm" py="xl">
-            <Paper shadow="xs" p="xl" withBorder>
-                <Title order={2} mb="md">
-                    <Group>
-                        <IconPackageImport size={28} />
-                        Receive Stock
-                    </Group>
-                </Title>
-                <Text c="dimmed" mb="xl">
-                    Add new inventory to the warehouse. Requires Admin privileges.
-                </Text>
+        <Container size="md" py="xl" className="page-container">
+            <Stack gap="xl">
+                <Paper shadow="xs" p="xl" withBorder style={{ position: 'relative' }}>
+                    <LoadingOverlay visible={mutation.isPending} overlayProps={{ radius: "sm", blur: 2 }} />
 
-                <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
-                    <Stack>
-                        <Select
-                            label="Article"
-                            placeholder="Select article"
-                            data={articlesQuery.data || []}
-                            searchable
-                            nothingFoundMessage="No articles found"
-                            disabled={articlesQuery.isLoading}
-                            {...form.getInputProps('article_id')}
-                            onChange={(val) => {
-                                form.setFieldValue('article_id', val || '');
-                                // Reset batch/expiry if article changes
-                                form.setFieldValue('batch_code', '');
-                                form.setFieldValue('expiry_date', null);
-                            }}
-                            required
-                        />
-
-                        <TextInput
-                            label="Order Number"
-                            placeholder="Invoice or PO number"
-                            {...form.getInputProps('order_number')}
-                            required
-                        />
-
-                        {!isConsumable && (
-                            <>
-                                <TextInput
-                                    label="Batch Code"
-                                    placeholder="e.g. 12345 or 1234567890"
-                                    description="4-5 digits (Mankiewicz) or 9-12 digits (Akzo)"
-                                    {...form.getInputProps('batch_code')}
-                                    required
-                                    rightSection={existingBatch ? <IconCheck color="green" size={16} /> : (isNewBatch ? <IconInfoCircle color="blue" size={16} /> : null)}
-                                />
-                                {existingBatch && (
-                                    <Text size="xs" c="green" mt={-10} mb="sm">
-                                        Existing Batch found. Expiry: {existingBatch.expiry_date}
-                                    </Text>
-                                )}
-                                {isNewBatch && !batchesQuery.isLoading && (
-                                    <Text size="xs" c="blue" mt={-10} mb="sm">
-                                        New Batch will be created.
-                                    </Text>
-                                )}
-
-                                <DateInput
-                                    label="Expiry Date"
-                                    placeholder="Select date"
-                                    valueFormat="DD.MM.YYYY"
-                                    minDate={new Date()}
-                                    {...form.getInputProps('expiry_date')}
-                                    required
-                                />
-                            </>
-                        )}
-
-                        <NumberInput
-                            label="Quantity (kg)"
-                            placeholder="0.00"
-                            decimalScale={2}
-                            fixedDecimalScale
-                            min={0}
-                            step={0.01}
-                            {...form.getInputProps('quantity_kg')}
-                            required
-                        />
-
-                        <Textarea
-                            label="Note"
-                            placeholder="Optional reception note"
-                            {...form.getInputProps('note')}
-                        />
-
-                        {mutation.isError && (
-                            <Alert icon={<IconX size={16} />} title="Error" color="red">
-                                {extractErrorMessage(mutation.error)}
-                            </Alert>
-                        )}
-
-                        <Group mt="md" grow>
-                            <Button type="submit" loading={mutation.isPending}>
-                                Receive Stock
-                            </Button>
+                    <Title order={2} mb="md">
+                        <Group>
+                            <IconPackageImport size={28} />
+                            {t('receiving.title')}
                         </Group>
-                    </Stack>
-                </form>
-            </Paper>
+                    </Title>
+
+                    <form onSubmit={form.onSubmit((values) => mutation.mutate(values))}>
+                        <Stack>
+                            <TextInput
+                                label={t('receiving.deliveryNote')}
+                                required
+                                {...form.getInputProps('delivery_note_number')}
+                            />
+
+                            <Group grow>
+                                <Select
+                                    label={t('orders.title')}
+                                    placeholder="Select order (optional)"
+                                    data={orderOptions}
+                                    searchable
+                                    clearable
+                                    {...form.getInputProps('order_id')}
+                                    onChange={(val) => {
+                                        form.setFieldValue('order_id', val || '');
+                                        form.setFieldValue('order_line_id', '');
+                                    }}
+                                />
+                                <Select
+                                    label={t('receiving.orderLine')}
+                                    placeholder={t('receiving.selectOrderLine')}
+                                    data={lineOptions}
+                                    disabled={!form.values.order_id}
+                                    searchable
+                                    clearable
+                                    {...form.getInputProps('order_line_id')}
+                                    onChange={(val) => {
+                                        form.setFieldValue('order_line_id', val || '');
+                                        if (val && selectedOrder) {
+                                            const line = selectedOrder.lines.find(l => l.id.toString() === val);
+                                            if (line) {
+                                                const article = articlesQuery.data?.find(a => a.article_no === line.article_no);
+                                                if (article) {
+                                                    form.setFieldValue('article_id', article.value);
+                                                    form.setFieldValue('uom', line.uom as string);
+                                                }
+                                            }
+                                        }
+                                    }}
+                                />
+                            </Group>
+
+                            <Select
+                                label={t('nav.articles')}
+                                data={articlesQuery.data || []}
+                                searchable
+                                required
+                                {...form.getInputProps('article_id')}
+                                onChange={(val) => {
+                                    form.setFieldValue('article_id', val || '');
+                                    form.setFieldValue('batch_code', '');
+                                    form.setFieldValue('expiry_date', null);
+                                }}
+                            />
+
+                            {hasBatch && (
+                                <>
+                                    <TextInput
+                                        label={t('receiving.batchCode')}
+                                        required
+                                        {...form.getInputProps('batch_code')}
+                                        rightSection={existingBatch ? <IconCheck color="green" size={16} /> : (isNewBatch ? <IconInfoCircle color="blue" size={16} /> : null)}
+                                    />
+                                    {isNewBatch && <Text size="xs" c="blue" mt={-10}>New batch will be created</Text>}
+
+                                    <DateInput
+                                        label={t('receiving.expiryDate')}
+                                        required
+                                        valueFormat="DD.MM.YYYY"
+                                        {...form.getInputProps('expiry_date')}
+                                    />
+                                </>
+                            )}
+
+                            <Group grow>
+                                <NumberInput
+                                    label={t('receiving.quantity')}
+                                    decimalScale={2}
+                                    step={0.01}
+                                    required
+                                    min={0.01}
+                                    {...form.getInputProps('quantity')}
+                                />
+                                <Select
+                                    label={t('receiving.uom')}
+                                    data={['KG', 'L']}
+                                    required
+                                    {...form.getInputProps('uom')}
+                                />
+                            </Group>
+
+                            <Textarea
+                                label="Note"
+                                placeholder={form.values.order_line_id ? 'Optional' : 'Required for ad-hoc'}
+                                required={!form.values.order_line_id}
+                                {...form.getInputProps('note')}
+                            />
+
+                            <Button type="submit" loading={mutation.isPending} fullWidth>
+                                {t('receiving.receiveStock')}
+                            </Button>
+                        </Stack>
+                    </form>
+                </Paper>
+
+                <Stack>
+                    <Title order={3}>{t('receiving.recentReceipts')}</Title>
+                    <ReceiptHistoryList />
+                </Stack>
+            </Stack>
         </Container>
     );
 }

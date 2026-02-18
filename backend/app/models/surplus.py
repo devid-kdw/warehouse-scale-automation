@@ -29,11 +29,11 @@ class Surplus(db.Model):
         db.ForeignKey('batches.id'),
         nullable=False
     )
-    quantity_kg = db.Column(
-        db.Numeric(14, 2),
-        nullable=False,
-        default=0
-    )
+    # quantity_kg removed (v3 decommission)
+    
+    # v3 unit-aware transition columns
+    quantity = db.Column(db.Numeric(14, 3), nullable=False, default=0)
+    uom = db.Column(db.String(20), nullable=False)
     reason = db.Column(db.Text, nullable=True)
     created_at = db.Column(
         db.DateTime(timezone=True),
@@ -52,7 +52,7 @@ class Surplus(db.Model):
             'location_id', 'article_id', 'batch_id',
             name='uq_surplus_location_article_batch'
         ),
-        db.CheckConstraint('quantity_kg >= 0', name='ck_surplus_quantity_positive'),
+        db.CheckConstraint('quantity >= 0', name='ck_surplus_quantity_positive'),
     )
     
     # Relationships
@@ -61,7 +61,7 @@ class Surplus(db.Model):
     batch = db.relationship('Batch', back_populates='surplus_items')
     
     def __repr__(self):
-        return f'<Surplus {self.quantity_kg}kg at {self.location_id}>'
+        return f'<Surplus {self.quantity} {self.uom} at {self.location_id}>'
     
     def to_dict(self):
         return {
@@ -69,7 +69,8 @@ class Surplus(db.Model):
             'location_id': self.location_id,
             'article_id': self.article_id,
             'batch_id': self.batch_id,
-            'quantity_kg': float(self.quantity_kg) if self.quantity_kg else 0,
+            'quantity': float(self.quantity) if self.quantity is not None else 0,
+            'uom': self.uom,
             'reason': self.reason,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

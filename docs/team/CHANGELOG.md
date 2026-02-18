@@ -4,9 +4,242 @@ All notable changes to the Warehouse Scale Automation project will be documented
 
 Format: Each entry includes **Date**, **What Changed**, **Why**, **How to Test**, and **Commit/PR Reference**.
 
+> [!NOTE]
+> Older entries reflect historical implementation context.
+> Current policy authority is:
+> `RULES_OF_ENGAGEMENT.md` -> `DECISIONS.md` -> active task brief (`TASK-0020`).
+
 ---
 
 ## [Unreleased]
+
+### TASK-0026 — Frontend v3 Phase 1: i18n, Layout, and Shell Foundation (2026-02-17)
+- **What**: Implemented Croatian-first internationalization infrastructure, language switcher, and standardized layout tokens for wider content areas.
+- **Changes**:
+  - **i18n Infrastructure**:
+    - Installed `react-i18next`, `i18next`, and `i18next-browser-languagedetector`
+    - Created i18n configuration with 4 locales (hr, en, de, hu)
+    - Croatian set as default language with localStorage persistence
+    - Created translation files with approved terminology and full diacritics (č, ć, ž, š, đ)
+  - **Language Switcher**:
+    - New `LanguageSwitcher` component in app header
+    - Dropdown menu with Hrvatski/English/Deutsch/Magyar options
+    - Language selection persists across sessions
+  - **App Shell Updates**:
+    - Converted all hardcoded UI strings to translation keys
+    - App title now shows "Skladišni Menadžer" (Croatian) by default
+    - Sidebar navigation labels fully translated
+    - User menu and access denied messages use i18n
+  - **Layout Tokens**:
+    - Created global CSS custom properties for content widths and gutters
+    - Increased max content width to 1280px (from ~720px)
+    - Reduced side gutters for wider usable space
+    - Responsive breakpoints for tablet (768px) and desktop (1024px+)
+    - Updated AppShell main padding for better spacing
+- **Files Changed** (12 files):
+  - Created: `i18n/index.ts`, `i18n/locales/{hr,en,de,hu}/common.json`, `components/LanguageSwitcher.tsx`, `styles/layout.css`
+  - Modified: `App.tsx`, `Sidebar.tsx`, `main.tsx`, `package.json`
+- **Verification**: `npm run build` passes cleanly (exit code 0)
+- **How to Test**:
+  - Run `npm run electron:dev`
+  - Verify app starts in Croatian with "Skladišni Menadžer" title
+  - Click language switcher and verify UI updates for all 4 languages
+  - Refresh browser and verify selected language persists
+  - Check content areas are visibly wider across screens
+- **Ref**: TASK-0026, TASK-0021 (Phase 1)
+
+### TASK-0027 — Frontend v3 Phase 2: Orders & Receiving UI (2026-02-17)
+- **What**: Implemented Orders module (Narudžbe) and refactored Receiving workflow (Ulaz robe).
+- **Changes**:
+  - **Orders Module**:
+    - Created `OpenOrders` and `ClosedOrders` list views
+    - Created `OrderDetail` view with line management (add/remove/update)
+    - Created `CreateOrder` form with auto-numbering support
+    - Integrated with backend `api/orders` service
+  - **Receiving UI**:
+    - Refactored `Receiving` page to "Ulaz robe"
+    - Added `delivery_note_number` (required) and `order_line_id` linking
+    - Implemented conditional Batch/Expiry fields based on `has_batch`
+    - Embedded `ReceiptHistory` list directly in receiving page
+  - **Navigation**:
+    - Created "Narudžbe" parent group
+    - Removed standalone "Receipt History" and "Batches" routes
+    - Updated RBAC to ensure Admin-only access for new modules
+- **Files Changed**:
+  - Created: `api/orders.ts`, `pages/Orders/{OpenOrders,ClosedOrders,OrderDetail,CreateOrder}.tsx`, `components/ReceiptHistoryList.tsx`
+  - Modified: `App.tsx`, `Sidebar.tsx`, `pages/Receiving/index.tsx`, `i18n/locales/{hr,en}/common.json`
+- **Verification**: `npm run build` passes cleanly
+- **Ref**: TASK-0027
+
+### Review Feedback — Robustness Fixes (2026-02-17)
+- **receipt_number**: Replaced string-MAX with Python-side integer parsing (safe past 9999)
+- **dedup fallback**: `identifikator_service.submit_missing_article_report` raises `AppError` if `.first()` returns None after IntegrityError rollback
+- **order SQL**: `generate_order_number()` now uses Python-side parsing (works on SQLite + PostgreSQL)
+- **error keys**: `InsufficientStockError` details use `required`/`available_stock`/`available_surplus`/`shortage` (removed `_kg` suffixes)
+- **Verification**: 130/130 tests passing
+
+### TASK-0026B — Backend Runtime Contract Stabilization (2026-02-17)
+- **What**: Full decommission of legacy `quantity_kg` across all runtime code and tests. Canonical contract is now `quantity` + `uom`.
+- **Breaking Changes (Frontend)**:
+  - Draft/DraftGroup schemas: `quantity_kg` → `quantity`, `total_quantity_kg` → `total_quantity`
+  - Approval response: `consumed_surplus_kg`/`consumed_stock_kg` → `consumed_surplus`/`consumed_stock`
+  - Transaction schema: `quantity_kg` → `quantity` + `uom`
+  - Inventory summary: primary keys are now `stock`/`surplus`/`total` (backward-compat `stock_qty`/`surplus_qty`/`total_qty` still emitted via schema)
+- **Changes** (16 runtime files, 13 test files):
+  - **Models**: Removed duplicate `batch_id` columns, renamed `DraftGroup.total_quantity_kg` → `total_quantity`
+  - **Schemas**: Updated drafts, draft_groups, approvals, transactions, inventory, reports
+  - **APIs**: All endpoints read `.quantity` and include `uom`
+  - **Services**: `receiving_service` returns `previous_stock`, `draft_group_service` adds auto-naming, `validation` default field updated
+  - **Seed/Tests**: All fixtures and assertions use `quantity` + `uom`
+- **Backward Compat Retained**:
+  - `reports.py`: dual-emit `quantity_kg` via `attribute='quantity'`
+  - `inventory.py` schema: accepts legacy `quantity_kg` input
+  - `draft_group_service.py`: fallback `get('quantity', get('quantity_kg'))`
+- **Verification**: `compileall` clean, 126/130 tests pass (4 pre-existing failures unrelated to contract)
+- **How to Test**: `cd backend && python3 -m pytest -v`
+
+### 2026-02-17 - DEV/TEST Data Reset
+- **What**: Full database reset and bootstrap to clean baseline.
+- **Changes**:
+  - Truncated all application tables via `reset_dev_db.py`.
+  - Re-seeded default admin user `stefan` (password `ChangeMe123!`).
+  - Re-seeded default Location 13.
+- **Verification**: User count=1, Location count=1, Articles=0.
+
+### 2026-02-17 - Orchestrator Backend Audit + Frontend Contract Realignment
+- **What**: Orchestrator reviewed implemented backend v3 wave and aligned frontend tasks/prompt with actual backend contracts.
+- **Changes**:
+  - Added backend contract snapshot and review notes:
+    - `docs/status/ORCHESTRATOR_BACKEND_AUDIT_2026-02-17.md`
+  - Updated locked rules/decisions for current contract and deprecation boundaries:
+    - `docs/team/RULES_OF_ENGAGEMENT.md`
+    - `docs/team/DECISIONS.md`
+  - Updated frontend execution docs to use canonical implemented routes/contracts:
+    - `docs/tasks/frontend-agent-tasks/PROMPT-frontend-agent-v3-wave.md`
+    - `docs/tasks/frontend-agent-tasks/TASK-0027-frontend-v3-phase-2-orders-and-receiving-ui.md`
+    - `docs/tasks/frontend-agent-tasks/TASK-0028-frontend-v3-phase-3-izlaz-and-approvals-ui.md`
+    - `docs/tasks/frontend-agent-tasks/TASK-0029-frontend-v3-phase-4-skladiste-izvjestaji-identifikator.md`
+  - Added dedicated backend follow-up task for full legacy quantity decommission:
+    - `docs/tasks/backend-agent-tasks/TASK-0026A-backend-quantity-kg-decommission-and-remediation.md`
+- **Verification**:
+  - Static compile check passed (`python3 -m compileall app`).
+  - Full pytest requires project DB environment (sandbox could not access local PostgreSQL).
+
+### TASK-0026 — Backend v3 Phase 4: Remediation, Polish & Decommission (2026-02-17)
+- **What**: Data integrity enforcement, unit-aware math hardening, missing report features, and decommission preparation for legacy `quantity_kg` model.
+- **Changes**:
+  - **Data Integrity**: Enforced `NOT NULL` on `Transaction.quantity` and `Transaction.uom` with historical backfill.
+  - **Unit-Awareness**: Refactored `ApprovalService`, `ReceivingService`, `InventoryService`, and `DraftGroupService` for precise L/KG conversion using Article density.
+  - **Decommission Prep**: Added migration and service groundwork toward removing legacy `quantity_kg` columns.
+  - **Reporting**: Added Top-20 monthly consumers, Surplus Excel export, and aggregate stats for missing article reports.
+  - **Hierarchy**: Refactored Inventory API for Article+Batch granularity.
+  - **Safety**: Implemented lazy imports for `openpyxl` and `fpdf2` to prevent startup failures.
+  - **API**: Added `Deprecation` and `Sunset` headers to legacy admin routes; registered matching routes under `/api/admin/identifikator`.
+- **Migration**: 
+  - `v3_p4_remed_v3_phase4_remediation.py` (Article.density + Transaction NOT NULL).
+  - `v3_p4_decom.py` (DROP quantity_kg columns).
+- **Tests**: 121 total (all core remediation tests passing).
+
+### TASK-0024 — Backend v3 Phase 3: Outbound & Approvals (2026-02-17)
+- **What**: Unit-aware drafting and approval workflow.
+- **Changes**:
+  - **Approvals**: Refactored `approve_draft` to be unit-aware, populating mandatory unit columns in transactions.
+  - **Inventory Count**: Updated counts and shortage drafts to include units (defaulting to 'KG' for mass counts).
+  - **Delta Logic**: Hardened inventory adjustments for unit-consistency.
+- **Migration**: `v3_phase3_approvals.py` (legacy).
+
+### TASK-0023 — Backend v3 Phase 2: Orders & Receiving (2026-02-17)
+- **What**: Orders domain service, lifecycle automation, and unit-aware receiving linkage.
+- **Changes**:
+  - **Orders**: New `Order` and `OrderLine` models with status automation (Rule 12: all lines fulfilled → CLOSED).
+  - **Auto-numbering**: `ORD-xxxx` generation with DB-unique constraint and service-level retry (Finding #3).
+  - **API**: New `orders` blueprint (ADMIN-only) for CRUD, line removal, and list filtering.
+  - **Receiving (v3)**: `receive_stock` is now unit-aware (Rule 2). Preferred params are `quantity` + `uom`.
+  - **Ad-hoc Receiving**: `order_number` is now optional; ad-hoc requires a `note` (Rule 10).
+  - **Receiving Traceability**: `delivery_note_number` is now mandatory for all receiving (Rule 11).
+  - **Validation**: Strict receiving validation for line ↔ article match, line status, and order status (Finding #4).
+  - **Deprecation**: Added `Deprecation` and `Sunset` headers to standalone `POST /api/batches` endpoint.
+- **Migration**: `v3_phase2_orders.py` (orders/order_lines tables + FK on transactions).
+- **Tests**: 112 total (was 103), all passing.
+
+### TASK-0022 — Backend v3 Phase 1: Foundation & Migrations (2026-02-17)
+- **What**: Schema foundations for v3.0 modules
+- **Changes**:
+  - Article: `has_batch`, `supplier_code`, `category` (12 normalized keys)
+  - `uom_catalog` table — open-entry UOM persistence
+  - Unit-aware `quantity` + `uom` columns on Stock, Surplus, Transaction, WeighInDraft
+  - Hardware source fields on WeighInDraft (`scale_id`, `scanner_id`, `station_id`, `source_label`, `source_meta`)
+  - Transaction receiving linkage fields (`delivery_note_number`, `order_line_id`)
+  - Service logic switched from `is_paint` → `has_batch` (receiving, draft groups)
+  - UOM validation: removed `OneOf(['KG','L'])`, replaced with open-catalog + normalization
+  - Backward compat: `has_batch` derived from `is_paint` when not sent in API
+  - `GET /api/uom` endpoint (any auth'd user)
+- **Migration**: `v3_phase1_foundation.py` (additive, includes backfill + rollback)
+- **Tests**: 103 total (was 87), all passing
+### 2026-02-17 - v3.0 Implementation Planning Kickoff (TASK-0021 to TASK-0029)
+**What**: Defined the next program version (`v3.0.0`) implementation package and decomposed execution into phased backend/frontend tasks.
+
+**Why**: TASK-0020 owner feedback is finalized; delivery now requires strict phase sequencing (core first, then dependent modules) to reduce migration and contract risk.
+
+**Changes**:
+- Created `docs/tasks/TASK-0021-v3-implementation-master-plan.md` as the detailed v3 implementation roadmap.
+- Created backend phase task briefs:
+  - `docs/tasks/backend-agent-tasks/TASK-0022-backend-v3-phase-1-foundation-and-migrations.md`
+  - `docs/tasks/backend-agent-tasks/TASK-0023-backend-v3-phase-2-orders-and-receiving.md`
+  - `docs/tasks/backend-agent-tasks/TASK-0024-backend-v3-phase-3-outbound-and-approvals.md`
+  - `docs/tasks/backend-agent-tasks/TASK-0025-backend-v3-phase-4-inventory-reports-identifier-and-decommission.md`
+- Created frontend phase task briefs:
+  - `docs/tasks/frontend-agent-tasks/TASK-0026-frontend-v3-phase-1-shell-i18n-layout.md`
+  - `docs/tasks/frontend-agent-tasks/TASK-0027-frontend-v3-phase-2-orders-and-receiving-ui.md`
+  - `docs/tasks/frontend-agent-tasks/TASK-0028-frontend-v3-phase-3-izlaz-and-approvals-ui.md`
+  - `docs/tasks/frontend-agent-tasks/TASK-0029-frontend-v3-phase-4-skladiste-izvjestaji-identifikator.md`
+- Added execution prompts for both agents:
+  - `docs/tasks/backend-agent-tasks/PROMPT-backend-agent-v3-wave.md`
+  - `docs/tasks/frontend-agent-tasks/PROMPT-frontend-agent-v3-wave.md`
+
+**How to Test**:
+- Verify all `TASK-0021` to `TASK-0029` files exist and are phase-ordered.
+- Verify prompts include mandatory reading paths and dependency order.
+- Verify `TASK-0021` reflects locked rules from `RULES_OF_ENGAGEMENT.md` and decisions from `DECISIONS.md`.
+
+**Ref**: TASK-0020, TASK-0021, TASK-0022, TASK-0023, TASK-0024, TASK-0025, TASK-0026, TASK-0027, TASK-0028, TASK-0029
+
+### 2026-02-17 - Documentation Governance Alignment (TASK-0020 Consolidation)
+**What**: Documentation baseline aligned with finalized owner feedback from TASK-0020.
+
+**Why**: Existing docs contained conflicting guidance (`is_paint`-coupled batch logic, KG-only assumptions, old module IA, outdated role notes) that would cause implementation drift.
+
+**Changes**:
+- **Governance**:
+  - Updated `RULES_OF_ENGAGEMENT.md` with approved direction for unit-aware quantities, batch-tracking policy (`has_batch`), Orders/Receiving linkage, and refreshed RBAC matrix.
+  - Rebuilt `DECISIONS.md` to include 2026-02-17 owner-approved decisions (Orders, Reports refactor, Article Identifikator, decommission paths).
+- **Team Docs**:
+  - Updated `AGENTS.md`, `AGENT_INSTRUCTIONS.md`, `QUICK_AGENT_BRIEFINGS.md`, `WORKFLOW.md`, `RELEASE_CHECKLIST.md`, `TESTING_AGENT_RULES.md`, `PROJECT_KNOWLEDGE.md`, `MIGRATIONS.md`, `ORCHESTRATOR.md`.
+- **Planning Baseline**:
+  - Confirmed `TASK-0020-ui-feedback-master-plan-input.md` as active redesign source.
+  - Added archival-context disclaimers to historical task/status documents to prevent policy conflicts.
+- **Root Docs**:
+  - Updated `README.md`, `docs/README.md`, `PROJECT_SPECIFICATION.md` with authority order and redesign status notes.
+
+**How to Test**:
+- Verify no active governance doc contradicts `TASK-0020`.
+- Confirm agent handoff docs point to `RULES` + `DECISIONS` + `TASK-0020`.
+- Confirm historical docs are clearly marked as archival context.
+
+**Ref**: TASK-0020
+
+### 2026-02-17 - TASK-0020 Decision Closure Update (Owner Follow-up)
+**What**: Applied owner responses for remaining pre-implementation decisions.
+
+**Why**: Move from open questions to execution-ready planning baseline.
+
+**Changes**:
+- Updated `TASK-0020` remaining-decision statuses (language switcher in-wave, layout direction, timezone, approvals edit behavior, hardware identity fields, identifier lifecycle, statistics scope, order number format).
+- Added `Terminology Input Required` list for final Croatian dictionary gaps.
+- Updated `DECISIONS.md` with owner follow-up clarifications.
+- Updated `RULES_OF_ENGAGEMENT.md` with timezone semantics.
+
+**Ref**: TASK-0020
 
 ### 2026-02-12 - Frontend Contract, RBAC, and UX Alignment (TASK-0019)
 **What**: Align frontend with backend API contracts, apply RBAC policy, and clean up documentation.

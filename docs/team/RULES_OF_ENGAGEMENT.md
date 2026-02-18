@@ -1,212 +1,167 @@
 # Rules of Engagement
 
-**Status**: 🔒 LOCKED  
-**Last Updated**: 2026-02-03
+**Status**: LOCKED  
+**Last Updated**: 2026-02-17
 
-These rules are **LOCKED** and cannot be changed without explicit approval. All agents must adhere to these constraints.
-
----
-
-## 🔒 Business Logic Rules
-
-### 1. Transaction Sign Convention
-
-**Rule**: Transactions represent **inventory changes**, not accounting debits/credits.
-
-- **Consumption** (WEIGH_IN, STOCK_CONSUMED, SURPLUS_CONSUMED): **Negative** quantity
-- **Receipt/Additions** (RECEIPT, INVENTORY_ADJUSTMENT with increase): **Positive** quantity
-- Transaction `quantity_kg` in database stores algebraic value (can be positive or negative)
-
-**Rationale**: Matches physical inventory movement; consumption reduces stock.
+These rules are LOCKED and cannot be changed without explicit project owner approval.
 
 ---
 
-### 2. Surplus-First Consumption
+## 1. Transaction Sign Convention
 
-**Rule**: When approving WEIGH_IN drafts, **surplus is consumed before stock**.
+Transactions represent physical inventory movement.
 
-**Logic**:
-1. Check if surplus exists for (location, article, batch)
-2. If surplus ≥ needed → consume from surplus only
-3. If surplus < needed → consume all surplus, then consume remainder from stock
-4. If insufficient stock → reject draft with error
+- Consumption (`WEIGH_IN`, `STOCK_CONSUMED`, `SURPLUS_CONSUMED`) is negative.
+- Additions (`STOCK_RECEIPT`, positive `INVENTORY_ADJUSTMENT`) are positive.
+- Legacy persistence still uses `quantity_kg`; transition target is unit-aware quantity model.
 
-**Rationale**: Surplus represents "buffer" from previous inventory adjustments; should be used first.
+## 2. Unit-Aware Quantity Direction (Approved, Mandatory for New Work)
 
-**Implementation**: See `backend/app/services/approval_service.py`
+- New UI and API work must be unit-aware, not KG-only.
+- Article UOM is authoritative for operational entry and display.
+- Migration from `quantity_kg`-centric model must preserve audit/history integrity.
+- Current stock-changing backend runtime supports only `KG` and `L` conversions.
+- Unsupported stock-changing UOM conversions must return `UNSUPPORTED_UOM_CONVERSION` (400).
 
----
+## 3. Surplus-First Consumption
 
-### 3. Location Fixed = 13
+When approving consumption drafts:
+1. Consume surplus first.
+2. Consume stock second.
+3. Reject if stock is insufficient.
 
-**Rule**: Location is **hardcoded to 13** in v1. No multi-location support.
+## 4. Location Fixed = 13 (v1)
 
-- UI should not show location selector
-- API can accept `location_id`, but v1 clients always send `13`
-- Database schema supports multiple locations (future-ready), but business logic assumes single location
+- UI does not expose location selector in v1.
+- API may accept `location_id`, but v1 clients send `13`.
 
-**Rationale**: Simplicity for initial deployment; avoid complexity until multi-site expansion.
+## 5. Batch Code Validation
 
----
+Batch code regex remains:
+- `^\d{4,5}$|^\d{9,12}$`
 
-### 4. Batch Code Validation
+## 6. Batch Tracking Policy (Supersedes Paint-Coupled Rule)
 
-**Rule**: Batch codes must match one of two formats:
+- Batch requirement is controlled by article master flag (`has_batch` / `is_batch_tracked`).
+- `is_paint` is classification only and must not drive mandatory batch logic.
+- If article is batch-tracked, batch + expiry rules apply.
 
-- **Mankiewicz**: Exactly **4 or 5 digits** (e.g., `0606`, `12345`)
-- **Akzo Nobel**: **9 to 12 digits** (e.g., `123456789`, `123456789012`)
+## 7. Batch Expiry Mismatch Protection
 
-**Regex**: `^\d{4,5}$|^\d{9,12}$`
+If existing batch expiry differs from provided expiry on receive, return `BATCH_EXPIRY_MISMATCH` (409).
 
-**Rationale**: Supplier-specific formats; validation prevents typos during manual entry.
+## 8. Stock Never Goes Below Zero
 
-**Implementation**: See `backend/app/services/validation.py`
+- Stock cannot become negative.
+- Approval and adjustment workflows must validate before write.
 
----
+## 9. Inventory Count Discrepancy Handling
 
-### 5. Article Aliases
+- If counted > system total: add difference to surplus.
+- If counted = system total: no change.
+- If counted < system total: create shortage draft for admin approval.
 
-**Rule**: Aliases are **lookup-only** shortcuts for finding articles.
+## 10. Receiving Workflow Boundaries
 
-- Maximum **5 aliases** per article
-- Aliases must be **globally unique** (cannot point to multiple articles)
-- Aliases cannot be used as primary identifiers in database foreign keys
-- Search endpoints accept aliases, but responses always return canonical `article_code`
+- Stock additions happen only through receiving workflow (or approved inventory-count pathways).
+- Receiving remains ADMIN-only.
+- Receiving may be linked to order line (`order_line_id`) or ad-hoc without order.
 
-**Rationale**: User convenience (e.g., `"RAL9005"` → finds article `800147`), but avoids data integrity issues.
+## 11. Orders + Receiving Linkage
 
-**Implementation**: See `backend/app/models/article_alias.py`
+- `delivery_note_number` is required for receiving traceability.
+- `order_line_id` is optional and used when receiving against an open order line.
+- Ad-hoc receiving (without order) is allowed and must include explanatory note.
 
----
+## 12. Order Lifecycle
 
-### 6. Stock Never Goes Below Zero
+- Orders are `OPEN` until all active lines are fully received.
+- Order moves to `CLOSED` automatically when all active lines are fulfilled.
+- Admin can edit/remove unresolved lines; status must be recalculated immediately.
 
-**Rule**: Stock quantities **cannot be negative**.
+## 13. Idempotency via `client_event_id`
 
-- Database constraint: `CHECK (quantity_kg >= 0)` on `stock` table
-- Approval service must validate sufficient stock before approving consumption drafts
-- If stock would go negative → draft is **rejected** with error `ERR_INSUFFICIENT_STOCK`
+- Create endpoints may accept `client_event_id`.
+- Duplicates must be handled idempotently.
 
-**Rationale**: Physical inventory cannot be negative; prevents data corruption.
+## 14. Audit Trail Is Mandatory
 
----
+Every inventory-changing operation must create transaction audit entry.
 
-### 7. Inventory Shortage Handling
+Required minimum fields:
+- `tx_type`
+- `occurred_at` (UTC)
+- algebraic quantity change
+- `user_id`
+- context metadata (`meta`)
 
-**Rule**: When inventory count reveals a **shortage** (physical < system), create a **draft** for admin approval, not immediate adjustment.
+When applicable, include:
+- `order_number`
+- `order_line_id`
+- `delivery_note_number`
 
-**Process**:
-1. Operator performs physical inventory count
-2. System calculates difference: `system_stock - physical_count`
-3. If difference > 0 (shortage):
-   - Create draft with `draft_type = INVENTORY_SHORTAGE`
-   - Admin must review and approve
-   - Upon approval → stock reduced, transaction created with audit trail
-4. If difference < 0 (surplus):
-   - Automatically add to `surplus` table (no approval needed)
-   - If surplus already exists, overwrite previous surplus
+## 15. RBAC
 
-**Rationale**: Shortages require investigation; surplus is expected variance and auto-tracked.
-
-**Implementation**: See `backend/app/services/inventory_service.py`
-
----
-
-### 8. JWT Secret Production Fail-Safe
-
-**Rule**: Application **must not start** in production mode with default/development JWT secret.
-
-**Validation** (in `backend/app/config.py`):
-```python
-if ENV == 'production' and JWT_SECRET_KEY == 'dev-secret-change-me':
-    raise ValueError("Cannot use default JWT secret in production!")
-```
-
-**Rationale**: Prevent security breach from forgotten configuration.
-
----
-
-## 🚨 Concurrency & Data Integrity
-
-### 9. Row-Level Locking for Approvals
-
-**Rule**: Approval service must use **FOR UPDATE** locking when modifying stock/surplus.
-
-```python
-stock = db.session.query(Stock).filter_by(...).with_for_update().first()
-```
-
-**Rationale**: Prevents race conditions when multiple admins approve drafts simultaneously.
-
-**Implementation**: See `backend/app/services/approval_service.py`
-
----
-
-### 10. Idempotency via `client_event_id`
-
-**Rule**: API endpoints that create transactions should accept optional `client_event_id`.
-
-- If provided, `client_event_id` must be **unique** (database constraint)
-- Duplicate `client_event_id` → return existing transaction (idempotent)
-- Prevents duplicate transactions from network retries
-
-**Rationale**: Mobile/desktop clients may retry requests; prevents accidental double-entries.
-
----
-
-## 📊 Audit Trail Requirements
-
-### 11. All Inventory Changes Must Be Logged
-
-**Rule**: Every change to stock/surplus **must** create a `Transaction` record.
-
-**Required fields**:
-- `tx_type`: WEIGH_IN, SURPLUS_CONSUMED, STOCK_CONSUMED, INVENTORY_ADJUSTMENT, RECEIPT
-- `occurred_at`: UTC timestamp
-- `quantity_kg`: Algebraic change (positive = addition, negative = consumption)
-- `user_id`: Who performed the action
-- `meta`: JSON with additional context (e.g., `{"draft_id": 123, "approval_action_id": 456}`)
-
-**Rationale**: Complete audit trail for compliance, troubleshooting, and reporting.
-
----
-
-## 🔐 Security & Authentication
-
-### 12. Role-Based Access Control
-
-**Rule**: Two roles only: **ADMIN** and **OPERATOR**.
+Only two roles exist: `ADMIN`, `OPERATOR`.
 
 | Action | OPERATOR | ADMIN |
-|--------|----------|-------|
-| Create drafts | ✅ | ✅ |
-| Approve/reject drafts | ❌ | ✅ |
-| View inventory | ✅ | ✅ |
-| Manage articles/batches | ❌ | ✅ |
-| View reports | ❌ | ✅ |
-| Manage users | ❌ | ✅ |
+|---|---|---|
+| Create drafts | YES | YES |
+| Approve/reject drafts | NO | YES |
+| View inventory | YES | YES |
+| Receive stock | NO | YES |
+| Manage orders | NO | YES |
+| Manage article master data | NO | YES |
+| Manage aliases | NO | YES |
+| Use Article Identifikator lookup | YES | YES |
+| Submit missing-article report | YES | YES |
+| Process missing-article reports | NO | YES |
+| View reports | NO | YES |
+| Manage users | NO | YES |
 
-**Implementation**: JWT contains `role` claim; endpoints check `@jwt_required()` + role validation.
+## 16. Security Fail-Safe
+
+Application must not start in production with default/weak JWT secret.
+
+## 17. Concurrency
+
+Inventory-changing approval/receiving flows must use row-level locking where required.
+
+## 18. Timezone Semantics
+
+- Persist timestamps in UTC.
+- For daily approvals grouping, use operational timezone `Europe/Berlin` (Hamburg context in current deployment).
+- Future versions should support location-driven timezone configuration.
+
+## 19. Backend Contract Stability and Deprecation Policy (v3)
+
+- Canonical Admin Identifikator API path is `/api/admin/identifikator/*`.
+- Legacy Admin Identifikator fallback path `/api/identifikator/admin/*` remains temporarily available with deprecation headers.
+- Standalone batch create endpoint `POST /api/batches` is deprecated and must not be used by new frontend flows.
+- Legacy transaction report endpoint `/api/reports/transactions` remains fallback-only and must not be used for new report UX.
+
+## 20. Transitional Quantity Compatibility Boundary
+
+- Backend may still expose legacy KG fields in some read contracts during transition.
+- New frontend work must prefer unit-aware fields (`quantity`, `uom`) when available.
+- Any feature that requires full removal of `quantity_kg` must wait for dedicated decommission task completion.
 
 ---
 
-## 🛑 Change Control
+## Change Control
 
-### How to Modify Locked Rules
-
-1. **Document the reason** for change (business requirement, bug fix, architecture improvement)
-2. **Get explicit approval** from project owner (Stefan)
-3. **Update this document** with new rule version and rationale
-4. **Create migration plan** if existing data/code is affected
-5. **Update all affected tests** and documentation
-
-**Do NOT** modify these rules without following this process.
+To modify locked rules:
+1. Record business reason.
+2. Get explicit owner approval.
+3. Update this file + `DECISIONS.md`.
+4. Define migration/test/documentation impact.
 
 ---
 
-## 📝 Version History
+## Version History
 
-| Date | Rule Changed | Reason | Approved By |
-|------|--------------|--------|-------------|
-| 2026-02-03 | Initial version | Project setup | Stefan |
-
+| Date | Rule Change | Reason | Approved By |
+|---|---|---|---|
+| 2026-02-03 | Initial locked rules | Initial project baseline | Stefan |
+| 2026-02-17 | Unit-aware direction, has_batch policy, Orders/Receiving linkage, updated RBAC matrix | TASK-0020 owner feedback consolidation | Stefan |
+| 2026-02-17 | Added v3 contract stability/deprecation and transitional quantity boundary rules | Backend implementation alignment and frontend contract safety | Stefan |

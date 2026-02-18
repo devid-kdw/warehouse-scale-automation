@@ -6,7 +6,8 @@ import {
     CreateArticlePayload, CreateBatchPayload, StockReceivePayload, StockReceiveResponse,
     InventoryResponse, InventoryCountPayload, TransactionsResponse, AliasesResponse,
     DraftGroup, DraftGroupSummary, CreateDraftGroupPayload,
-    ReceiptHistoryResponse, TransactionQueryParams
+    ReceiptHistoryResponse, TransactionQueryParams,
+    MissingItemReport, AdminReportUpdatePayload
 } from './types';
 import { AxiosError } from 'axios';
 
@@ -26,6 +27,11 @@ export const getArticles = async (active: 'true' | 'false' | 'all' = 'true') => 
 
 export const createArticle = async (data: CreateArticlePayload) => {
     const response = await apiClient.post<Article>(API_ENDPOINTS.ARTICLES.CREATE, data);
+    return response.data;
+};
+
+export const updateArticle = async (id: number, data: Partial<CreateArticlePayload>) => {
+    const response = await apiClient.patch<Article>(API_ENDPOINTS.ARTICLES.UPDATE(id), data);
     return response.data;
 };
 
@@ -120,7 +126,47 @@ export const rejectDraftGroup = async (id: number) => {
     return response.data;
 };
 
+export const getDailyDrafts = async (status?: string) => {
+    const response = await apiClient.get<any[]>(API_ENDPOINTS.DAILY_DRAFTS.LIST, {
+        params: { status }
+    });
+    return response.data;
+};
+
+export const getDailyDraftDetail = async (date: string, locationId: number) => {
+    const response = await apiClient.get<any>(API_ENDPOINTS.DAILY_DRAFTS.GET(date, locationId));
+    return response.data;
+};
+
+export const approveDailyDrafts = async (date: string, locationId: number) => {
+    const response = await apiClient.post(API_ENDPOINTS.DAILY_DRAFTS.APPROVE(date, locationId));
+    return response.data;
+};
+
+export const rejectDailyDrafts = async (date: string, locationId: number) => {
+    const response = await apiClient.post(API_ENDPOINTS.DAILY_DRAFTS.REJECT(date, locationId));
+    return response.data;
+};
+
+export const updateDailyDraftLines = async (
+    date: string,
+    locationId: number,
+    // P0 fix: payload is a single line edit, not an array
+    lineEdit: { article_id: number; batch_id: number; new_total_qty: number }
+) => {
+    const response = await apiClient.patch(API_ENDPOINTS.DAILY_DRAFTS.UPDATE_LINES(date, locationId), lineEdit);
+    return response.data;
+};
+
+
 // --- Inventory ---
+export const getInventory = async (filters?: { category?: string, search?: string, state?: 'active' | 'inactive' | 'all' }) => {
+    const response = await apiClient.get<InventoryResponse>(API_ENDPOINTS.INVENTORY.LIST, {
+        params: filters
+    });
+    return response.data;
+};
+
 export const getInventorySummary = async (filters?: { article_id?: number, batch_id?: number, location_id?: number }) => {
     const response = await apiClient.get<InventoryResponse>(API_ENDPOINTS.INVENTORY.SUMMARY, {
         params: filters
@@ -196,4 +242,91 @@ export const extractErrorMessage = (error: unknown): string => {
         return 'Failed to parse error message';
     }
     return (error as Error).message || 'Unknown error occurred';
+};
+
+// --- Reports ---
+export const getInventurnaLista = async () => {
+    const response = await apiClient.get<any>(API_ENDPOINTS.REPORTS.INVENTURNA);
+    return response.data;
+};
+
+export const getSurplusLista = async () => {
+    const response = await apiClient.get<any>(API_ENDPOINTS.REPORTS.SURPLUS);
+    return response.data;
+};
+
+export const getStatistics = async (type: 'consumption' | 'reorder-risk' | 'top-consumers') => {
+    let url: string = API_ENDPOINTS.REPORTS.STATISTICS.CONSUMPTION;
+    if (type === 'reorder-risk') url = API_ENDPOINTS.REPORTS.STATISTICS.REORDER_RISK;
+    if (type === 'top-consumers') url = API_ENDPOINTS.REPORTS.STATISTICS.TOP_CONSUMERS;
+
+    const response = await apiClient.get<any>(url);
+    return response.data;
+};
+
+// Auth-safe blob export (P1 fix: use apiClient with Bearer token, not window.open)
+export const downloadReportExport = async (
+    type: 'inventurna' | 'surplus',
+    format: 'excel' | 'pdf'
+): Promise<void> => {
+    const url = API_ENDPOINTS.REPORTS.EXPORT(type, format);
+    const response = await apiClient.get(url, { responseType: 'blob' });
+    const blob = new Blob([response.data], {
+        type: format === 'excel'
+            ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            : 'application/pdf'
+    });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `${type}_${new Date().toISOString().slice(0, 10)}.${format === 'excel' ? 'xlsx' : 'pdf'}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(objectUrl);
+};
+
+/** @deprecated Use downloadReportExport instead */
+export const getReportExportUrl = (type: 'inventurna' | 'surplus', format: 'excel' | 'pdf') => {
+    return API_ENDPOINTS.REPORTS.EXPORT(type, format);
+};
+
+// --- Identifikator (P0 fix: correct endpoints, params, and payloads) ---
+
+/** Lookup article by code, name, or alias. Backend returns single article or 404. */
+export const lookupArticle = async (query: string): Promise<Article | null> => {
+    try {
+        const response = await apiClient.get<Article>(API_ENDPOINTS.IDENTIFIKATOR.LOOKUP, {
+            params: { query }  // P0 fix: param is 'query' not 'q'
+        });
+        return response.data;
+    } catch (e: any) {
+        if (e?.response?.status === 404) return null;
+        throw e;
+    }
+};
+
+/** @deprecated Use lookupArticle instead */
+export const searchArticles = lookupArticle as any;
+
+/** Submit a missing article report. P0 fix: payload is {raw_input, location_id} */
+export const reportMissingItem = async (rawInput: string, locationId: number = 13) => {
+    const response = await apiClient.post(API_ENDPOINTS.IDENTIFIKATOR.REPORT_MISSING, {
+        raw_input: rawInput,
+        location_id: locationId
+    });
+    return response.data;
+};
+
+/** Get admin queue of pending missing article reports. */
+export const getIdentifierQueue = async (): Promise<MissingItemReport[]> => {
+    const response = await apiClient.get<MissingItemReport[]>(API_ENDPOINTS.IDENTIFIKATOR.ADMIN_QUEUE);
+    // Backend returns array directly (not wrapped in {items: [...]})
+    return Array.isArray(response.data) ? response.data : (response.data as any).items || [];
+};
+
+/** Resolve a missing article report. P0 fix: uses PATCH not POST. */
+export const resolveMissingReport = async (id: number, payload: AdminReportUpdatePayload) => {
+    const response = await apiClient.patch(API_ENDPOINTS.IDENTIFIKATOR.RESOLVE(id), payload);
+    return response.data;
 };

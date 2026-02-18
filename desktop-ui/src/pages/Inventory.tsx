@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
     Container, Title, Paper, Table, Group, Button, TextInput,
     Badge, LoadingOverlay, Modal, NumberInput, Stack, Text,
-    Menu, ActionIcon, Tooltip, Tabs, Alert
+    Menu, ActionIcon, Tooltip, Select, SegmentedControl, Alert
 } from '@mantine/core';
 import { useDisclosure } from '@mantine/hooks';
 import { useForm } from '@mantine/form';
@@ -11,15 +11,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
     IconCheck,
     IconSearch, IconClipboardCheck, IconX, IconDotsVertical, IconPackageImport, IconAlertTriangle,
-    IconRefresh
+    IconRefresh, IconPlus, IconEdit, IconArchive, IconTag
 } from '@tabler/icons-react';
-import { getInventorySummary, performInventoryCount, extractErrorMessage } from '../api/services';
-import { InventoryItem, InventoryCountPayload } from '../api/types';
+import {
+    getInventory, performInventoryCount, extractErrorMessage,
+    archiveArticle, getArticles
+} from '../api/services';
+import { InventoryItem, InventoryCountPayload, Article } from '../api/types';
 import { EmptyState } from '../components/common/EmptyState';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { ArticleForm } from './Inventory/components/ArticleForm';
+import { AliasesEditor } from './Inventory/components/AliasesEditor';
 
 dayjs.extend(relativeTime);
 
@@ -37,7 +42,6 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
         },
     });
 
-    // Reset form when item changes
     useEffect(() => {
         if (item) {
             form.setFieldValue('counted_qty', item.total_qty);
@@ -69,33 +73,33 @@ function CountModal({ item, opened, onClose }: { item: InventoryItem | null, ope
     });
 
     return (
-        <Modal opened={opened} onClose={onClose} title="Perform Inventory Count" centered>
+        <Modal opened={opened} onClose={onClose} title="Popis zaliha" centered>
             <form onSubmit={form.onSubmit((values) => countMutation.mutate(values))}>
                 <Stack>
                     <Text size="sm">
-                        <b>Article:</b> {item?.article_no} - {item?.description} <br />
-                        <b>Batch:</b> {item?.batch_code} <br />
-                        <b>Location:</b> {item?.location_code}
+                        <b>Artikl:</b> {item?.article_no} - {item?.description} <br />
+                        <b>Šarža:</b> {item?.batch_code} <br />
+                        <b>Lokacija:</b> {item?.location_code}
                     </Text>
 
                     <NumberInput
-                        label="Counted Quantity (Total)"
-                        description={`Current System Qty: ${item?.total_qty} KG`}
+                        label="Prebrojana količina (ukupno)"
+                        description={`Trenutna sistemska kol.: ${item?.total_qty}`}
                         decimalScale={2}
                         min={0}
                         {...form.getInputProps('counted_qty')}
                     />
 
                     <TextInput
-                        label="Note"
-                        placeholder="Reason for discrepancy..."
+                        label="Napomena"
+                        placeholder="Razlog odstupanja..."
                         {...form.getInputProps('note')}
                     />
 
                     <Group justify="flex-end" mt="md">
-                        <Button variant="default" onClick={onClose}>Cancel</Button>
+                        <Button variant="default" onClick={onClose}>Odustani</Button>
                         <Button type="submit" loading={countMutation.isPending} leftSection={<IconClipboardCheck size={16} />}>
-                            Submit Count
+                            Spremi popis
                         </Button>
                     </Group>
                 </Stack>
@@ -108,34 +112,82 @@ export default function Inventory() {
     const navigate = useNavigate();
     const auth = useAuth();
     const isAdmin = auth.user?.role === 'ADMIN';
-    const [search, setSearch] = useState('');
-    const [activeTab, setActiveTab] = useState<string | null>('paint');
-    const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
-    const [opened, { open, close }] = useDisclosure(false);
+    const queryClient = useQueryClient();
 
-    // Fetch Inventory
+    // State
+    const [search, setSearch] = useState('');
+    // P1 fix: category Select replaces Paint/Consumables tabs
+    const [category, setCategory] = useState<string | null>(null);
+    // P1 fix: state filter (active/inactive/all)
+    const [stateFilter, setStateFilter] = useState<'active' | 'inactive' | 'all'>('active');
+
+    const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
+    const [countModalOpened, { open: openCountModal, close: closeCountModal }] = useDisclosure(false);
+
+    // Article Management State
+    const [articleFormOpened, { open: openArticleForm, close: closeArticleForm }] = useDisclosure(false);
+    const [aliasesOpened, { open: openAliases, close: closeAliases }] = useDisclosure(false);
+    const [editingArticle, setEditingArticle] = useState<Article | null>(null);
+
+    // Fetch Inventory — pass category + state to API
     const { data, isLoading, isError, error, refetch } = useQuery({
-        queryKey: ['inventory'],
-        queryFn: () => getInventorySummary(),
+        queryKey: ['inventory', category, stateFilter],
+        queryFn: () => getInventory({
+            category: category || undefined,
+            state: stateFilter,
+            search: undefined // client-side search
+        }),
     });
 
-    // Filter logic
+    // Client-side search filtering
     const filteredItems = data?.items.filter(item => {
-        const matchesSearch = item.article_no.toLowerCase().includes(search.toLowerCase()) ||
-            (item.description || '').toLowerCase().includes(search.toLowerCase()) ||
-            item.batch_code.toLowerCase().includes(search.toLowerCase()) ||
-            item.location_code.toLowerCase().includes(search.toLowerCase());
-
-        const matchesCategory = activeTab === 'paint'
-            ? (item.is_paint !== false)   // undefined or true => paint
-            : (item.is_paint === false);  // only explicit false => consumable
-
-        return matchesSearch && matchesCategory;
+        if (!search) return true;
+        const s = search.toLowerCase();
+        return item.article_no.toLowerCase().includes(s) ||
+            (item.description || '').toLowerCase().includes(s) ||
+            item.batch_code.toLowerCase().includes(s) ||
+            (item.manufacturer || '').toLowerCase().includes(s);
     }) || [];
 
-    const openCountModal = (item: InventoryItem) => {
-        setSelectedItem(item);
-        open();
+    const handleEditArticle = async (item: InventoryItem) => {
+        try {
+            const response = await queryClient.fetchQuery({
+                queryKey: ['article', item.article_no],
+                queryFn: () => getArticles('all').then(res => res.items.find(a => a.id === item.article_id))
+            });
+
+            if (response) {
+                setEditingArticle(response);
+                openArticleForm();
+            } else {
+                notifications.show({ title: 'Greška', message: 'Detalji artikla nisu pronađeni', color: 'red' });
+            }
+        } catch (e) {
+            notifications.show({ title: 'Greška', message: 'Nije moguće učitati detalje artikla', color: 'red' });
+        }
+    };
+
+    const handleArchiveArticle = async (articleId: number) => {
+        if (confirm('Jeste li sigurni da želite arhivirati ovaj artikl?')) {
+            try {
+                await archiveArticle(articleId);
+                notifications.show({ title: 'Uspjeh', message: 'Artikl arhiviran', color: 'green' });
+                refetch();
+            } catch (e) {
+                notifications.show({ title: 'Greška', message: 'Arhiviranje nije uspjelo', color: 'red' });
+            }
+        }
+    };
+
+    const handleAliases = async (item: InventoryItem) => {
+        setEditingArticle({
+            id: item.article_id,
+            article_no: item.article_no,
+            description: item.description || '',
+            is_paint: item.is_paint || false,
+            is_active: true
+        } as Article);
+        openAliases();
     };
 
     const rows = filteredItems.map((item) => {
@@ -153,26 +205,27 @@ export default function Inventory() {
                     <Group gap="xs">
                         <Text size="sm" fw={500}>{item.article_no}</Text>
                         {hasSurplus && <Badge size="xs" color="cyan" circle>S</Badge>}
-                        {isExpired && <Tooltip label="Expired"><IconAlertTriangle size={14} color="red" /></Tooltip>}
+                        {isExpired && <Tooltip label="Isteklo"><IconAlertTriangle size={14} color="red" /></Tooltip>}
                     </Group>
                     <Text size="xs" c="dimmed">{item.description}</Text>
+                </Table.Td>
+                <Table.Td>
+                    <Text size="sm">{item.manufacturer || '-'}</Text>
                 </Table.Td>
                 <Table.Td>
                     <Group gap="xs">
                         <Text size="sm" fw={500}>{item.batch_code}</Text>
                         {item.batch_code === 'NA' && <Badge size="xs" variant="outline" color="gray">System</Badge>}
                     </Group>
+                    {item.expiry_date && (
+                        <Text c={isExpired ? 'red' : (isExpiringSoon ? 'orange' : 'dimmed')} size="xs">
+                            {dayjs(item.expiry_date).format('DD.MM.YYYY')}
+                        </Text>
+                    )}
                 </Table.Td>
-                <Table.Td>
-                    {item.expiry_date ? (
-                        <Tooltip label={isExpired ? "Expired" : (isExpiringSoon ? "Expiring Soon" : "Valid Batch")}>
-                            <Text c={isExpired ? 'red' : (isExpiringSoon ? 'orange' : undefined)} size="sm" style={{ cursor: 'help' }}>
-                                {dayjs(item.expiry_date).format('DD.MM.YYYY')}
-                            </Text>
-                        </Tooltip>
-                    ) : '-'}
+                <Table.Td fw={700} align="right">
+                    {item.total_qty.toFixed(2)} <Text span size="xs" fw={400} c="dimmed">{item.uom || 'KG'}</Text>
                 </Table.Td>
-                <Table.Td fw={700} align="right">{item.total_qty.toFixed(2)}</Table.Td>
                 <Table.Td align="right">
                     <Text c="dimmed" size="sm">{item.updated_at ? dayjs(item.updated_at).fromNow() : '-'}</Text>
                 </Table.Td>
@@ -186,7 +239,7 @@ export default function Inventory() {
                             </Menu.Target>
 
                             <Menu.Dropdown>
-                                <Menu.Label>Actions</Menu.Label>
+                                <Menu.Label>Akcije na zalihama</Menu.Label>
                                 <Menu.Item
                                     leftSection={<IconPackageImport size={14} />}
                                     onClick={() => navigate('/receiving', {
@@ -197,14 +250,32 @@ export default function Inventory() {
                                         }
                                     })}
                                 >
-                                    Receive More
+                                    Primi robu
                                 </Menu.Item>
                                 <Menu.Item
                                     leftSection={<IconClipboardCheck size={14} />}
-                                    onClick={() => openCountModal(item)}
+                                    onClick={() => { setSelectedItem(item); openCountModal(); }}
                                 >
-                                    Inventory Count
+                                    Popis zaliha
                                 </Menu.Item>
+
+                                <Menu.Divider />
+                                <Menu.Label>Akcije na artiklu</Menu.Label>
+                                <Menu.Item leftSection={<IconEdit size={14} />} onClick={() => handleEditArticle(item)}>
+                                    Uredi artikl
+                                </Menu.Item>
+                                <Menu.Item leftSection={<IconTag size={14} />} onClick={() => handleAliases(item)}>
+                                    Aliasi
+                                </Menu.Item>
+
+                                <Menu.Item
+                                    leftSection={<IconArchive size={14} />}
+                                    color="red"
+                                    onClick={() => handleArchiveArticle(item.article_id)}
+                                >
+                                    Arhiviraj artikl
+                                </Menu.Item>
+                                {/* We can't know if it's inactive from InventoryItem yet, so Restore isn't easily shown here unless we assume filtered list implies it */}
                             </Menu.Dropdown>
                         </Menu>
                     </Table.Td>
@@ -216,20 +287,20 @@ export default function Inventory() {
     return (
         <Container size="xl" py="xl">
             <Group justify="space-between" mb="lg">
-                <Title order={2}>Inventory Overview</Title>
+                <Title order={2}>Pregled artikala</Title>
                 {isAdmin && (
-                    <Button leftSection={<IconClipboardCheck size={16} />} disabled>
-                        Full Stocktake
+                    <Button leftSection={<IconPlus size={16} />} onClick={() => { setEditingArticle(null); openArticleForm(); }}>
+                        Novi artikl
                     </Button>
                 )}
             </Group>
 
             {isError && (
-                <Alert icon={<IconAlertTriangle size={16} />} title="Error loading inventory" color="red" mb="md">
+                <Alert icon={<IconAlertTriangle size={16} />} title="Greška pri učitavanju" color="red" mb="md">
                     <Stack gap="xs">
                         <Text size="sm">{extractErrorMessage(error)}</Text>
                         <Button variant="outline" size="xs" color="red" leftSection={<IconRefresh size={14} />} onClick={() => refetch()} style={{ width: 'fit-content' }}>
-                            Retry
+                            Pokušaj ponovo
                         </Button>
                     </Stack>
                 </Alert>
@@ -237,35 +308,55 @@ export default function Inventory() {
 
             <Paper shadow="xs" p="md" withBorder>
                 <Group mb="md" justify="space-between">
-                    <TextInput
-                        placeholder="Search by article, batch, or location..."
-                        leftSection={<IconSearch size={16} />}
-                        value={search}
-                        onChange={(e) => setSearch(e.currentTarget.value)}
-                        style={{ flex: 1 }}
+                    <Group style={{ flex: 1 }} gap="sm">
+                        <TextInput
+                            placeholder="Pretraži po artiklu, šarži..."
+                            leftSection={<IconSearch size={16} />}
+                            value={search}
+                            onChange={(e) => setSearch(e.currentTarget.value)}
+                            style={{ width: 260 }}
+                        />
+                        {/* P1 fix: category Select replaces Paint/Consumables tabs */}
+                        <Select
+                            placeholder="Sve kategorije"
+                            clearable
+                            data={[
+                                { value: 'paint', label: 'Boje' },
+                                { value: 'consumable', label: 'Potrošni materijal' },
+                                { value: 'other', label: 'Ostalo' },
+                            ]}
+                            value={category}
+                            onChange={setCategory}
+                            style={{ width: 200 }}
+                        />
+                    </Group>
+                    {/* P1 fix: state SegmentedControl */}
+                    <SegmentedControl
+                        value={stateFilter}
+                        onChange={(v) => setStateFilter(v as 'active' | 'inactive' | 'all')}
+                        data={[
+                            { label: 'Aktivni', value: 'active' },
+                            { label: 'Neaktivni', value: 'inactive' },
+                            { label: 'Svi', value: 'all' },
+                        ]}
+                        size="xs"
                     />
-                    <Tabs value={activeTab} onChange={setActiveTab} variant="pills">
-                        <Tabs.List>
-                            <Tabs.Tab value="paint">Paint Articles</Tabs.Tab>
-                            <Tabs.Tab value="consumable">Consumables</Tabs.Tab>
-                        </Tabs.List>
-                    </Tabs>
                 </Group>
 
                 <div style={{ position: 'relative', minHeight: 200 }}>
                     <LoadingOverlay visible={isLoading} overlayProps={{ radius: "sm", blur: 2 }} />
 
                     {filteredItems.length === 0 && !isLoading ? (
-                        <EmptyState message="No inventory items found" />
+                        <EmptyState message="Nema stavki." />
                     ) : (
                         <Table striped highlightOnHover>
                             <Table.Thead>
                                 <Table.Tr>
-                                    <Table.Th>Article</Table.Th>
-                                    <Table.Th>Batch</Table.Th>
-                                    <Table.Th>Expiry</Table.Th>
-                                    <Table.Th style={{ textAlign: 'right' }}>Total Qty (KG)</Table.Th>
-                                    <Table.Th style={{ textAlign: 'right' }}>Last Updated</Table.Th>
+                                    <Table.Th>Artikl</Table.Th>
+                                    <Table.Th>Proizvođač</Table.Th>
+                                    <Table.Th>Šarža / Rok</Table.Th>
+                                    <Table.Th style={{ textAlign: 'right' }}>Kol.</Table.Th>
+                                    <Table.Th style={{ textAlign: 'right' }}>Zadnja aktivnost</Table.Th>
                                     {isAdmin && <Table.Th w={50}></Table.Th>}
                                 </Table.Tr>
                             </Table.Thead>
@@ -277,8 +368,20 @@ export default function Inventory() {
 
             <CountModal
                 item={selectedItem}
-                opened={opened}
-                onClose={() => { close(); setSelectedItem(null); }}
+                opened={countModalOpened}
+                onClose={() => { closeCountModal(); setSelectedItem(null); }}
+            />
+
+            <ArticleForm
+                opened={articleFormOpened}
+                onClose={() => { closeArticleForm(); setEditingArticle(null); }}
+                article={editingArticle}
+            />
+
+            <AliasesEditor
+                article={editingArticle}
+                opened={aliasesOpened}
+                onClose={() => { closeAliases(); setEditingArticle(null); }}
             />
         </Container >
     );

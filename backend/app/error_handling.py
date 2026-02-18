@@ -30,7 +30,17 @@ ERROR_CODES = {
     'ALIAS_LIMIT_REACHED': 409,
     'ALIAS_NOT_FOUND': 404,
     'FORBIDDEN': 403,
+    'UNSUPPORTED_UOM_CONVERSION': 400,
+    'FAILED_DEPENDENCY': 424,
+    'NOT_IMPLEMENTED': 501,
     'INTERNAL_ERROR': 500,
+    'NOT_FOUND': 404,
+    'CONFLICT': 409,
+    'BATCH_EXPIRY_MISMATCH': 409,
+    'INVALID_ADJUSTMENT': 400,
+    'NO_DRAFTS_FOUND': 404,
+    'MIXED_UOM_IN_AGGREGATION': 400,
+    'NEGATIVE_INVENTORY_NOT_ALLOWED': 409,
 }
 
 
@@ -75,13 +85,13 @@ class InsufficientStockError(AppError):
     
     def __init__(self, required: float, available: float, available_surplus: float = 0, message: str = None):
         details = {
-            'required_kg': required,
-            'available_stock_kg': available,
-            'available_surplus_kg': available_surplus,
-            'shortage_kg': round(required - available - available_surplus, 2)
+            'required': required,
+            'available_stock': available,
+            'available_surplus': available_surplus,
+            'shortage': round(required - available - available_surplus, 2)
         }
         if not message:
-            message = f'Insufficient inventory: required {required}kg, available {available + available_surplus}kg (stock: {available}kg, surplus: {available_surplus}kg)'
+            message = f'Insufficient inventory: required {required}, available {available + available_surplus} (stock: {available}, surplus: {available_surplus})'
         super().__init__(
             code='INSUFFICIENT_STOCK',
             message=message,

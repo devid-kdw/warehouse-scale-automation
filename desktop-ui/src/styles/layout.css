@@ -1,0 +1,70 @@
+/* Global Layout Tokens - v3 Phase 1 */
+
+:root {
+    /* Content Width Tokens */
+    --layout-content-max-width-sm: 720px;
+    --layout-content-max-width-md: 960px;
+    --layout-content-max-width-lg: 1280px;
+    --layout-content-max-width-xl: 1440px;
+
+    /* Gutter/Spacing Tokens */
+    --layout-gutter-horizontal: 16px;
+    --layout-gutter-horizontal-tablet: 24px;
+    --layout-gutter-horizontal-desktop: 32px;
+
+    /* Responsive Breakpoints (matching Mantine defaults + tablets) */
+    --breakpoint-sm: 576px;
+    --breakpoint-md: 768px;
+    /* Tablet */
+    --breakpoint-lg: 1024px;
+    /* Desktop */
+    --breakpoint-xl: 1280px;
+}
+
+/* Override Mantine Container component for wider layouts */
+.mantine-Container-root {
+    max-width: var(--layout-content-max-width-lg) !important;
+    padding-left: var(--layout-gutter-horizontal);
+    padding-right: var(--layout-gutter-horizontal);
+}
+
+/* Tablet breakpoint overrides */
+@media (min-width: 768px) {
+    .mantine-Container-root {
+        padding-left: var(--layout-gutter-horizontal-tablet);
+        padding-right: var(--layout-gutter-horizontal-tablet);
+    }
+}
+
+/* Desktop breakpoint overrides */
+@media (min-width: 1024px) {
+    .mantine-Container-root {
+        padding-left: var(--layout-gutter-horizontal-desktop);
+        padding-right: var(--layout-gutter-horizontal-desktop);
+    }
+}
+
+/* AppShell Main content area - additional inner padding only, DO NOT override padding-left/right
+   as Mantine AppShell sets those automatically to account for the sidebar width offset */
+.mantine-AppShell-main>* {
+    /* Inner content gets extra breathing room */
+    padding-top: 8px;
+}
+
+@media (min-width: 768px) {
+    .mantine-AppShell-main>* {
+        padding-top: 16px;
+    }
+}
+
+/* Form and table containers - use wider defaults */
+.page-container {
+    max-width: var(--layout-content-max-width-lg);
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Ensure tables and forms have adequate width */
+.mantine-Table-root {
+    min-width: 100%;
+}

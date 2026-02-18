@@ -8,23 +8,29 @@ QUANTITY_MAX = 9999.99
 
 
 class DraftSchema(Schema):
-    """WeighInDraft response schema."""
+    """WeighInDraft response schema (unit-aware)."""
     id = fields.Integer(dump_only=True)
     location_id = fields.Integer(required=True)
     article_id = fields.Integer(required=True)
     batch_id = fields.Integer(required=True)
-    quantity_kg = fields.Float(required=True)
+    quantity = fields.Float(required=True)
+    uom = fields.String(dump_only=True)
     status = fields.String(dump_only=True)
     draft_type = fields.String(dump_only=True, metadata={'description': 'WEIGH_IN or INVENTORY_SHORTAGE'})
     created_by_user_id = fields.Integer(allow_none=True)
     source = fields.String(dump_default='manual')
     client_event_id = fields.String(required=True)
     note = fields.String(allow_none=True)
+    scale_id = fields.String(dump_only=True)
+    scanner_id = fields.String(dump_only=True)
+    station_id = fields.String(dump_only=True)
+    source_label = fields.String(dump_only=True)
+    source_meta = fields.Raw(dump_only=True)
     created_at = fields.DateTime(dump_only=True)
 
 
 class DraftCreateSchema(Schema):
-    """Schema for creating a draft."""
+    """Schema for creating a draft (unit-aware)."""
     location_id = fields.Integer(
         required=True,
         metadata={'description': 'Location ID'}
@@ -37,10 +43,14 @@ class DraftCreateSchema(Schema):
         required=True,
         metadata={'description': 'Batch ID'}
     )
-    quantity_kg = fields.Float(
+    quantity = fields.Float(
         required=True,
         validate=validate.Range(min=QUANTITY_MIN, max=QUANTITY_MAX),
-        metadata={'description': f'Quantity in kg ({QUANTITY_MIN}-{QUANTITY_MAX})'}
+        metadata={'description': f'Quantity ({QUANTITY_MIN}-{QUANTITY_MAX})'}
+    )
+    uom = fields.String(
+        load_default=None, allow_none=True,
+        metadata={'description': 'Unit of measure (defaults to article UOM if omitted)'}
     )
     client_event_id = fields.String(
         required=True,
@@ -58,29 +68,29 @@ class DraftCreateSchema(Schema):
     )
     note = fields.String(allow_none=True, validate=validate.Length(max=500))
     
-    @validates('quantity_kg')
+    @validates('quantity')
     def validate_quantity_precision(self, value, **kwargs):
         """Validate quantity has max 2 decimal places."""
         rounded = round(value, 2)
         if abs(value - rounded) > 0.001:
-            raise ValidationError('quantity_kg must have at most 2 decimal places')
+            raise ValidationError('quantity must have at most 2 decimal places')
 
 
 class DraftUpdateSchema(Schema):
     """Schema for updating a draft (PATCH)."""
-    quantity_kg = fields.Float(
+    quantity = fields.Float(
         validate=validate.Range(min=QUANTITY_MIN, max=QUANTITY_MAX),
-        metadata={'description': f'Quantity in kg ({QUANTITY_MIN}-{QUANTITY_MAX})'}
+        metadata={'description': f'Quantity ({QUANTITY_MIN}-{QUANTITY_MAX})'}
     )
     note = fields.String(allow_none=True, validate=validate.Length(max=500))
     
-    @validates('quantity_kg')
+    @validates('quantity')
     def validate_quantity_precision(self, value, **kwargs):
         """Validate quantity has max 2 decimal places."""
         if value is not None:
             rounded = round(value, 2)
             if abs(value - rounded) > 0.001:
-                raise ValidationError('quantity_kg must have at most 2 decimal places')
+                raise ValidationError('quantity must have at most 2 decimal places')
 
 
 class DraftQuerySchema(Schema):

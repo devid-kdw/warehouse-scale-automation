@@ -60,7 +60,8 @@ class DraftGroupList(MethodView):
             location_id=group_data['location_id'],
             user_id=current_user_id,
             lines=group_data['lines'],
-            name=group_data.get('name')
+            name=group_data.get('name'),
+            description=group_data.get('description')
         )
         return group, 201
 
@@ -96,13 +97,14 @@ class DraftGroupDetail(MethodView):
     @blp.alt_response(404, schema=ErrorResponseSchema, description='Group not found')
     @jwt_required()
     def patch(self, group_data, group_id):
-        """Update draft group (e.g. rename)."""
+        """Update draft group (name and/or description)."""
         current_user_id = int(get_jwt_identity())
         
         try:
-            group = draft_group_service.update_group_name(
+            group = draft_group_service.update_group_details(
                 group_id=group_id,
-                name=group_data['name'],
+                name=group_data.get('name'),
+                description=group_data.get('description'),
                 actor_user_id=current_user_id
             )
             return group

@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Historical Snapshot Notice**
+> This task brief documents earlier implementation phases and may contain superseded assumptions.
+> Active direction is defined by:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 # Task Brief: TASK-0019 — Frontend Contract, RBAC, and UX Alignment
 
 **Created**: 2026-02-12  

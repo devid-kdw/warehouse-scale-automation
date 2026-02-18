@@ -9,6 +9,7 @@ export const API_ENDPOINTS = {
         CREATE: '/api/articles',
         RESOLVE: '/api/articles/resolve',
         GET: (articleNo: string) => `/api/articles/${articleNo}`,
+        UPDATE: (id: number) => `/api/articles/id/${id}`,  // P0 fix: must be /api/articles/id/<id>
         ARCHIVE: (id: number) => `/api/articles/${id}/archive`,
         RESTORE: (id: number) => `/api/articles/${id}/restore`,
         DELETE: (id: number) => `/api/articles/${id}`,
@@ -29,6 +30,8 @@ export const API_ENDPOINTS = {
     },
 
     INVENTORY: {
+        LIST: '/api/inventory',
+        INSPECT: (articleId: number) => `/api/inventory/${articleId}/inspect`,
         SUMMARY: '/api/inventory/summary',
         COUNT: '/api/inventory/count',
         ADJUST: '/api/inventory/adjust',
@@ -38,6 +41,25 @@ export const API_ENDPOINTS = {
 
     TRANSACTIONS: {
         LIST: '/api/transactions',
+    },
+
+    REPORTS: {
+        INVENTURNA: '/api/reports/inventurna',
+        SURPLUS: '/api/reports/surplus',
+        STATISTICS: {
+            CONSUMPTION: '/api/reports/statistics/consumption',
+            REORDER_RISK: '/api/reports/statistics/reorder-risk',
+            TOP_CONSUMERS: '/api/reports/statistics/top-consumers',
+        },
+        EXPORT: (type: 'inventurna' | 'surplus', format: 'excel' | 'pdf') => `/api/reports/${type}/export/${format}`,
+    },
+
+    // P0 fix: Identifikator canonical contract
+    IDENTIFIKATOR: {
+        LOOKUP: '/api/identifikator/lookup',       // GET ?query=...
+        REPORT_MISSING: '/api/identifikator/report', // POST {raw_input, location_id}
+        ADMIN_QUEUE: '/api/admin/identifikator/queue',  // GET
+        RESOLVE: (id: number) => `/api/admin/identifikator/queue/${id}`, // PATCH
     },
 
     ALIASES: {
@@ -53,5 +75,13 @@ export const API_ENDPOINTS = {
         RENAME: (id: number) => `/api/draft-groups/${id}`,
         APPROVE: (id: number) => `/api/draft-groups/${id}/approve`,
         REJECT: (id: number) => `/api/draft-groups/${id}/reject`,
+    },
+
+    DAILY_DRAFTS: {
+        LIST: '/api/drafts/daily',
+        GET: (date: string, locationId: number) => `/api/drafts/daily/${date}/${locationId}`,
+        APPROVE: (date: string, locationId: number) => `/api/drafts/daily/${date}/${locationId}/approve`,
+        REJECT: (date: string, locationId: number) => `/api/drafts/daily/${date}/${locationId}/reject`,
+        UPDATE_LINES: (date: string, locationId: number) => `/api/drafts/daily/${date}/${locationId}/lines`,
     }
 } as const;

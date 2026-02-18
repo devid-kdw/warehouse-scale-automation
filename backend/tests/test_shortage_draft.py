@@ -20,7 +20,8 @@ def shortage_draft(app, location, article, batch, user):
             location_id=location,
             article_id=article,
             batch_id=batch,
-            quantity_kg=Decimal('5.00'),
+            quantity=Decimal('5.00'),
+            uom='KG',
             client_event_id='shortage-test-event',
             created_by_user_id=user,
             source='inventory_count',
@@ -44,13 +45,13 @@ def test_approve_shortage_draft_success(client, app, user, shortage_draft, stock
     with app.app_context():
         # Check stock reduced
         s = Stock.query.first() # only one stock
-        assert s.quantity_kg == Decimal('5.00') # 10 - 5
+        assert s.quantity == Decimal('5.00') # 10 - 5
         
         # Check Transaction
         tx = Transaction.query.filter_by(source='shortage_approval').first()
         assert tx is not None
         assert tx.tx_type == 'INVENTORY_ADJUSTMENT'
-        assert tx.quantity_kg == Decimal('-5.00')
+        assert tx.quantity == Decimal('-5.00')
 
 
 def test_approve_shortage_draft_insufficient_stock(client, app, user, shortage_draft, stock):
@@ -60,7 +61,7 @@ def test_approve_shortage_draft_insufficient_stock(client, app, user, shortage_d
     # Stock is 10. Increase draft to 15.
     with app.app_context():
         d = WeighInDraft.query.get(shortage_draft)
-        d.quantity_kg = Decimal('15.00')
+        d.quantity = Decimal('15.00')
         db.session.commit()
         
     response = client.post(f'/api/drafts/{shortage_draft}/approve', headers=headers)

@@ -5,6 +5,7 @@ import {
     Alert, Text, Stack, Box
 } from '@mantine/core';
 import { IconLock, IconUser, IconAlertCircle, IconDatabase } from '@tabler/icons-react';
+import { useTranslation } from 'react-i18next';
 import { apiClient } from '../api/client';
 import { setTokens, setBaseUrl, getBaseUrl, AuthUser } from '../api/auth';
 import logo from '../assets/enikon-logo.jpg';
@@ -16,6 +17,7 @@ interface LoginResponse {
 }
 
 export default function Login() {
+    const { t } = useTranslation('common');
     const navigate = useNavigate();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -30,7 +32,6 @@ export default function Login() {
         setLoading(true);
 
         try {
-            // Save base URL before login attempt
             setBaseUrl(baseUrl);
 
             const response = await apiClient.post<LoginResponse>('/api/auth/login', {
@@ -39,11 +40,8 @@ export default function Login() {
             });
 
             const { access_token, refresh_token, user } = response.data;
-
-            // Save tokens and user info
             setTokens(access_token, refresh_token, user);
 
-            // Navigate based on role
             if (user.role === 'ADMIN') {
                 navigate('/drafts');
             } else {
@@ -54,7 +52,7 @@ export default function Login() {
             const message = err.response?.data?.error?.message
                 || err.response?.data?.msg
                 || err.message
-                || 'Login failed';
+                || 'Prijava nije uspjela';
             setError(message);
         } finally {
             setLoading(false);
@@ -73,19 +71,17 @@ export default function Login() {
         >
             <Container size="xs">
                 <Paper shadow="xl" p="xl" radius="md" withBorder>
-                    {/* Logo and Title */}
                     <Stack align="center" mb="xl">
                         <img src={logo} alt="Enikon Aerospace" style={{ height: 60 }} />
-                        <Title order={2}>Warehouse Ops</Title>
-                        <Text c="dimmed" size="sm">Sign in to continue</Text>
+                        <Title order={2}>{t('login.title')}</Title>
+                        <Text c="dimmed" size="sm">{t('login.subtitle')}</Text>
                     </Stack>
 
-                    {/* Login Form */}
                     <form onSubmit={handleLogin}>
                         <Stack>
                             <TextInput
-                                label="Username"
-                                placeholder="Enter username"
+                                label={t('login.username')}
+                                placeholder={t('login.usernamePlaceholder')}
                                 leftSection={<IconUser size={16} />}
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
@@ -94,8 +90,8 @@ export default function Login() {
                             />
 
                             <PasswordInput
-                                label="Password"
-                                placeholder="Enter password"
+                                label={t('login.password')}
+                                placeholder={t('login.passwordPlaceholder')}
                                 leftSection={<IconLock size={16} />}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
@@ -103,20 +99,19 @@ export default function Login() {
                                 autoComplete="current-password"
                             />
 
-                            {/* Advanced Settings Toggle */}
                             <Button
                                 variant="subtle"
                                 size="xs"
                                 onClick={() => setShowAdvanced(!showAdvanced)}
                                 leftSection={<IconDatabase size={14} />}
                             >
-                                {showAdvanced ? 'Hide' : 'Show'} Server Settings
+                                {showAdvanced ? t('login.hideServerSettings') : t('login.showServerSettings')}
                             </Button>
 
                             {showAdvanced && (
                                 <TextInput
-                                    label="Backend URL"
-                                    description="URL of the warehouse backend server"
+                                    label={t('login.backendUrl')}
+                                    description={t('login.backendUrlDesc')}
                                     placeholder="http://localhost:5001"
                                     value={baseUrl}
                                     onChange={(e) => setBaseUrlState(e.target.value)}
@@ -140,14 +135,13 @@ export default function Login() {
                                 size="md"
                                 mt="md"
                             >
-                                Sign In
+                                {t('login.signIn')}
                             </Button>
                         </Stack>
                     </form>
 
-                    {/* Footer */}
                     <Text c="dimmed" size="xs" ta="center" mt="xl">
-                        Default credentials: stefan / ChangeMe123!
+                        {t('login.defaultCredentials')}
                     </Text>
                 </Paper>
             </Container>

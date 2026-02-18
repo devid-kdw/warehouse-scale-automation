@@ -1,0 +1,137 @@
+{
+    "app": {
+        "title": "Warehouse Manager",
+        "disconnected": "Disconnected"
+    },
+    "nav": {
+        "drafts": "Automatic Entry",
+        "approvals": "Approvals",
+        "bulkEntry": "Bulk Entry",
+        "articles": "Articles",
+        "batches": "Batches",
+        "inventory": "Inventory",
+        "orders": "Orders",
+        "openOrders": "Open Orders",
+        "closedOrders": "Closed Orders",
+        "receiving": "Receive Stock",
+        "receiptHistory": "Receipt History",
+        "reports": "Reports",
+        "settings": "Settings"
+    },
+    "user": {
+        "logout": "Logout"
+    },
+    "role": {
+        "ADMIN": "Administrator",
+        "OPERATOR": "Operator"
+    },
+    "common": {
+        "search": "Search by name/code/alias",
+        "cancel": "Cancel",
+        "save": "Save",
+        "delete": "Delete",
+        "edit": "Edit",
+        "add": "Add",
+        "submit": "Submit",
+        "loading": "Loading...",
+        "error": "Error",
+        "success": "Success"
+    },
+    "auth": {
+        "accessDenied": "Access Denied",
+        "noPermission": "You do not have permission to view this page."
+    },
+    "language": {
+        "hr": "Hrvatski",
+        "en": "English",
+        "de": "Deutsch",
+        "hu": "Magyar"
+    },
+    "orders": {
+        "title": "Orders",
+        "orderNumber": "Order Number",
+        "supplierCode": "Supplier Code",
+        "supplierName": "Supplier",
+        "deliveryDate": "Delivery Date",
+        "orderedQty": "Ordered",
+        "receivedQty": "Received",
+        "status": "Status",
+        "open": "Open",
+        "closed": "Closed",
+        "createOrder": "New Order",
+        "editOrder": "Edit Order",
+        "lines": "Lines",
+        "addLine": "Add Line",
+        "removeLine": "Remove Line",
+        "autoNumber": "Auto Number"
+    },
+    "receiving": {
+        "title": "Receive Stock",
+        "deliveryNote": "Delivery Note Number",
+        "orderLine": "Order Line",
+        "selectOrderLine": "Select order line (optional)",
+        "adHocNote": "Note (required for non-order receipt)",
+        "batchRequired": "Article has batch",
+        "batchCode": "Batch",
+        "expiryDate": "Expiry Date",
+        "quantity": "Quantity",
+        "uom": "UOM",
+        "unsupportedUom": "UOM '{uom}' is not supported for receiving (only KG or L)",
+        "receiveStock": "Receive Stock",
+        "recentReceipts": "Recent Receipts",
+        "receiptNumber": "Receipt Number"
+    },
+    "entries": {
+        "title": "Automatic Entry",
+        "subtitle": "Create new weight drafts",
+        "locationId": "Location ID",
+        "locationDesc": "Default is 13 (Main Scale)",
+        "entryMode": "Entry Mode",
+        "manual": "Manual",
+        "scale": "Scale",
+        "article": "Article",
+        "selectArticle": "Select article",
+        "batch": "Batch",
+        "selectBatch": "Select batch",
+        "quantity": "Quantity",
+        "waitingForScale": "Waiting for scale...",
+        "submit": "Submit Entry",
+        "expiredBatch": "Warning: Expired Batch",
+        "expiredBatchDesc": "This batch expired on {date}. You can still proceed, but this will be flagged.",
+        "successMsg": "Draft created! ID: {id}",
+        "goToApprovals": "Go to Approvals"
+    },
+    "izlaz": {
+        "title": "Outbound",
+        "description": "Group Description (Required)",
+        "outboundNumber": "Outbound Number",
+        "generated": "(Generating...)",
+        "addLine": "Add Line",
+        "submit": "Create Outbound",
+        "success": "Outbound created successfully!",
+        "article": "Article",
+        "batch": "Batch",
+        "quantity": "Quantity",
+        "uom": "UOM",
+        "actions": "Actions"
+    },
+    "approvals": {
+        "title": "Approvals",
+        "date": "Date",
+        "location": "Location",
+        "itemCount": "Item Count",
+        "status": "Status",
+        "actions": "Actions",
+        "approveDay": "Approve Day",
+        "rejectDay": "Reject Day",
+        "viewDetails": "View Details",
+        "detailsTitle": "Details for {date}",
+        "article": "Article",
+        "batch": "Batch",
+        "totalQty": "Total Qty",
+        "draftCount": "Draft Count",
+        "successApprove": "Day approved successfully",
+        "successReject": "Day rejected successfully",
+        "noDrafts": "No pending drafts."
+    }
+}

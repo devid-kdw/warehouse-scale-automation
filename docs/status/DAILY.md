@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Historical Snapshot Notice**
+> This status file is an archival report for a past point in time.
+> For current rules and active direction use:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 # Daily Micro-Update
 
 This is a running log of daily progress. Keep entries brief (3-5 sentences max).

@@ -1,0 +1,47 @@
+{
+    "app": {
+        "title": "Lager-Manager",
+        "disconnected": "Getrennt"
+    },
+    "nav": {
+        "drafts": "Automatische Eingabe",
+        "approvals": "Genehmigungen",
+        "bulkEntry": "Masseneingabe",
+        "articles": "Artikel",
+        "batches": "Chargen",
+        "inventory": "Bestand",
+        "receiving": "Wareneingang",
+        "receiptHistory": "Eingangshistorie",
+        "reports": "Berichte",
+        "settings": "Einstellungen"
+    },
+    "user": {
+        "logout": "Abmelden"
+    },
+    "role": {
+        "ADMIN": "Administrator",
+        "OPERATOR": "Bediener"
+    },
+    "common": {
+        "search": "Nach Name/Code/Alias suchen",
+        "cancel": "Abbrechen",
+        "save": "Speichern",
+        "delete": "Löschen",
+        "edit": "Bearbeiten",
+        "add": "Hinzufügen",
+        "submit": "Senden",
+        "loading": "Laden...",
+        "error": "Fehler",
+        "success": "Erfolg"
+    },
+    "auth": {
+        "accessDenied": "Zugriff verweigert",
+        "noPermission": "Sie haben keine Berechtigung, diese Seite zu sehen."
+    },
+    "language": {
+        "hr": "Hrvatski",
+        "en": "English",
+        "de": "Deutsch",
+        "hu": "Magyar"
+    }
+}

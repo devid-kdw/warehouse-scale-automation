@@ -10,6 +10,9 @@ from .weigh_in_draft import WeighInDraft
 from .draft_group import DraftGroup
 from .approval_action import ApprovalAction
 from .transaction import Transaction
+from .uom_catalog import UomCatalog
+from .order import Order, OrderLine
+from .missing_article_report import MissingArticleReport
 
 __all__ = [
     'User',
@@ -23,5 +26,9 @@ __all__ = [
     'DraftGroup',
     'ApprovalAction',
     'Transaction',
+    'UomCatalog',
+    'Order',
+    'OrderLine',
+    'MissingArticleReport',
 ]
 

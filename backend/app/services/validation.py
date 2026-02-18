@@ -53,7 +53,7 @@ def validate_batch_code(batch_code: str) -> bool:
     return True
 
 
-def validate_quantity(quantity: float, field_name: str = 'quantity_kg') -> Decimal:
+def validate_quantity(quantity: float, field_name: str = 'quantity') -> Decimal:
     """Validate and round quantity to 2 decimal places.
     
     Args:
@@ -114,7 +114,7 @@ def validate_quantity_adjustment(quantity: float, allow_negative: bool = False) 
     if quantity is None:
         raise AppError(
             'VALIDATION_ERROR',
-            'quantity_kg is required'
+            'quantity is required'
         )
     
     # Round to 2 decimal places
@@ -126,7 +126,7 @@ def validate_quantity_adjustment(quantity: float, allow_negative: bool = False) 
     if not allow_negative and rounded < Decimal('0'):
         raise AppError(
             'VALIDATION_ERROR',
-            'quantity_kg must be non-negative for set mode',
+            'quantity must be non-negative for set mode',
             {'value': float(rounded)}
         )
     

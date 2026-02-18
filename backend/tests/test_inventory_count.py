@@ -37,12 +37,12 @@ def test_inventory_count_over(client, app, user, location, article, batch, stock
     # Verify DB
     with app.app_context():
         new_surplus = Surplus.query.filter_by(batch_id=batch).first()
-        assert new_surplus.quantity_kg == Decimal('7.00')  # 5 + 2
+        assert new_surplus.quantity == Decimal('7.00')  # 5 + 2
         
         # Verify transaction
         tx = Transaction.query.filter_by(batch_id=batch).order_by(Transaction.id.desc()).first()
         assert tx.tx_type == 'INVENTORY_ADJUSTMENT'
-        assert tx.quantity_kg == Decimal('2.00')
+        assert tx.quantity == Decimal('2.00')
         assert tx.meta['reason'] == 'inventory_count_over'
 
 
@@ -75,16 +75,16 @@ def test_inventory_count_under_creates_draft(client, app, user, location, articl
     with app.app_context():
         # Surplus should be 0
         new_surplus = Surplus.query.filter_by(batch_id=batch).first()
-        assert new_surplus.quantity_kg == Decimal('0.00')
+        assert new_surplus.quantity == Decimal('0.00')
         
         # Stock should NOT change yet
         new_stock = Stock.query.filter_by(batch_id=batch).first()
-        assert new_stock.quantity_kg == Decimal('10.00')
+        assert new_stock.quantity == Decimal('10.00')
         
         # Draft created
         draft = WeighInDraft.query.get(data['shortage_draft_id'])
         assert draft.draft_type == 'INVENTORY_SHORTAGE'
-        assert draft.quantity_kg == Decimal('7.00')  # Total 15 - Counted 8 = 7
+        assert draft.quantity == Decimal('7.00')  # Total 15 - Counted 8 = 7
         assert draft.status == 'DRAFT'
 
 

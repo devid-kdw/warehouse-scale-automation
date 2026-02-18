@@ -10,73 +10,104 @@ from .approval_service import approve_draft, reject_draft
 from . import batch_service
 
 
-def _generate_group_name(source: str) -> str:
-    """Generate auto-name for draft group.
-    
-    Format: {Source}_{Counter}-{YYYY-MM-DD}
-    Example: AdminDraft_001-2026-02-07
+from sqlalchemy.exc import IntegrityError
+import time
+import random
+
+def _generate_receipt_number() -> str:
+    """Generate sequential receipt number (0001, 0002...).
+
+    Uses Python-side parsing instead of DB-specific string operations
+    so it works on both PostgreSQL and SQLite.
     """
-    today = datetime.now(timezone.utc).date()
-    today_str = today.strftime('%Y-%m-%d')
+    rows = db.session.query(DraftGroup.receipt_number).all()
+
+    max_val = 0
+    for (rn,) in rows:
+        if rn and rn.isdigit():
+            max_val = max(max_val, int(rn))
+
+    return f"{max_val + 1:04d}"
+
+
+def _generate_group_name(source: str) -> str:
+    """Generate auto-name based on source and daily counter."""
+    from datetime import date as _date
+    today_str = _date.today().strftime('%Y-%m-%d')
     
-    # Normalize source for name
-    source_prefix = source.replace('ui_', '').replace('_', '').capitalize() + "Draft"
+    prefix = 'AdminDraft' if source == 'ui_admin' else 'OperatorDraft'
     
-    # Count existing groups for this source today
-    # We use a localized query. 
-    # Note: This is not strictly race-condition proof without a separate counter table,
-    # but for draft naming it's acceptable (duplicates allowed in name column if not unique constraint, 
-    # but we desire uniqueness).
-    # To be safer, we could append random suffix if collision, but let's stick to spec.
+    # Count existing groups today
+    today_count = db.session.query(db.func.count(DraftGroup.id)).filter(
+        db.func.date(DraftGroup.created_at) == _date.today()
+    ).scalar() or 0
     
-    start_of_day = datetime.combine(today, datetime.min.time()).replace(tzinfo=timezone.utc)
-    
-    count = db.session.query(DraftGroup).filter(
-        DraftGroup.source == source,
-        DraftGroup.created_at >= start_of_day
-    ).count()
-    
-    counter = count + 1
-    return f"{source_prefix}_{counter:03d}-{today_str}"
+    counter = today_count + 1
+    return f"{prefix}_{counter:03d}-{today_str}"
 
 
 def create_group(
     location_id: int,
     user_id: int,
     lines: List[Dict],
-    name: Optional[str] = None,
+    description: Optional[str] = None,
+    name: Optional[str] = None, # Legacy alias
     source: str = 'ui_admin'
 ) -> DraftGroup:
     """Create a group with multiple lines atomically."""
     
-    # Auto-name if no name provided
-    if not name:
-        name = _generate_group_name(source)
+    # Map description from legacy name if missing
+    final_desc = description or name
     
-    group = DraftGroup(
-        name=name,
-        location_id=location_id,
-        created_by_user_id=user_id,
-        source=source,
-        status=DraftGroup.STATUS_DRAFT
-    )
-    db.session.add(group)
-    db.session.flush() # Get group ID
+    # Auto-name if no name/description provided
+    if not final_desc:
+        final_desc = _generate_group_name(source)
+    
+    max_retries = 10
+    group = None
+    
+    for attempt in range(max_retries):
+        try:
+            # Always generate a new receipt number
+            receipt_no = _generate_receipt_number()
+            
+            group = DraftGroup(
+                receipt_number=receipt_no,
+                description=final_desc,
+                name=final_desc,
+                location_id=location_id,
+                created_by_user_id=user_id,
+                source=source,
+                status=DraftGroup.STATUS_DRAFT
+            )
+            db.session.add(group)
+            db.session.flush() # Check for unique violation
+            break
+        except IntegrityError:
+            db.session.rollback()
+            if attempt == max_retries - 1:
+                raise
+            # Small random sleep to reduce collision probability on next try
+            time.sleep(random.uniform(0.01, 0.05))
+            continue
+        except Exception:
+            db.session.rollback()
+            raise
     
     for line_data in lines:
-        # Resolve Article to check is_paint
+        # Resolve Article to check batch-tracking requirement
         article = db.session.get(Article, line_data['article_id'])
         if not article:
              raise AppError('ARTICLE_NOT_FOUND', f"Article {line_data['article_id']} not found")
         
-        # Handle Batch ID Logic
+        # Handle Batch ID Logic (v3: uses has_batch, not is_paint)
         batch_id = line_data.get('batch_id')
         
         if batch_id is None:
-            if article.is_paint:
-                 raise AppError('BATCH_REQUIRED', f"Batch ID is required for paint article {article.article_no}")
+            if article.has_batch:
+                 raise AppError('BATCH_REQUIRED', f"Batch ID is required for batch-tracked article {article.article_no}")
             
-            # Consumable: Find or Create 'NA' system batch (using shared service)
+            # Non-batch-tracked: Find or Create 'NA' system batch (using shared service)
             batch = batch_service.get_or_create_system_batch(article.id)
             batch_id = batch.id
         
@@ -90,10 +121,21 @@ def create_group(
                 f"A draft with client_event_id '{line_data['client_event_id']}' already exists",
                 {'client_event_id': line_data['client_event_id']}
             )
+        
+        # Resolve UOM
+        uom = line_data.get('uom')
+        if not uom:
+            uom = article.uom
+        
+        # Determine quantity field
+        # Legacy callers might still send quantity_kg, check for quantity first
+        raw_qty = line_data.get('quantity', line_data.get('quantity_kg'))
+        if raw_qty is None:
+             raise AppError('VALIDATION_ERROR', 'quantity is required')
             
         # Round quantity
-        qty = Decimal(str(line_data['quantity_kg'])).quantize(
-            Decimal('0.01'),
+        qty = Decimal(str(raw_qty)).quantize(
+            Decimal('0.001') if uom in ['L', 'KG'] else Decimal('1.000'), # Higher precision for mass/vol
             rounding=ROUND_HALF_UP
         )
         
@@ -102,7 +144,8 @@ def create_group(
             location_id=location_id,
             article_id=line_data['article_id'],
             batch_id=batch_id,
-            quantity_kg=qty,
+            quantity=qty,
+            uom=uom,
             draft_type=line_data.get('draft_type', WeighInDraft.DRAFT_TYPE_WEIGH_IN),
             client_event_id=line_data['client_event_id'],
             note=line_data.get('note'),
@@ -115,22 +158,26 @@ def create_group(
     return group
 
 
-def update_group_name(group_id: int, name: str, actor_user_id: int) -> DraftGroup:
-    """Update draft group name."""
+def update_group_details(group_id: int, name: Optional[str], description: Optional[str], actor_user_id: int) -> DraftGroup:
+    """Update draft group name and description."""
     group = db.session.query(DraftGroup).filter_by(id=group_id).first()
     
     if not group:
         raise AppError('GROUP_NOT_FOUND', f'Draft Group {group_id} not found')
         
-    # Only allow renaming if DRAFT
+    # Only allow editing if DRAFT
     if group.status != DraftGroup.STATUS_DRAFT:
         raise AppError(
             'GROUP_NOT_DRAFT',
-            f'Cannot rename group with status {group.status}',
+            f'Cannot edit group with status {group.status}',
             {'current_status': group.status}
         )
         
-    group.name = name
+    if name is not None:
+        group.name = name
+    if description is not None:
+        group.description = description
+        
     db.session.commit()
     return group
 
@@ -173,7 +220,8 @@ def approve_group(group_id: int, actor_user_id: int, note: Optional[str] = None)
         key = (d.article_id, d.batch_id)
         if key not in needs:
             needs[key] = {'WEIGH_IN': Decimal('0'), 'INVENTORY_SHORTAGE': Decimal('0')}
-        needs[key][d.draft_type] += Decimal(str(d.quantity_kg))
+        # Sum unit quantities 
+        needs[key][d.draft_type] += Decimal(str(d.quantity))
         
     # Lock Stock and Surplus rows
     locked_stock = {}
@@ -187,7 +235,7 @@ def approve_group(group_id: int, actor_user_id: int, note: Optional[str] = None)
             batch_id=bat_id
         ).with_for_update().first()
         
-        locked_stock[(art_id, bat_id)] = Decimal(str(stock.quantity_kg)) if stock else Decimal('0')
+        locked_stock[(art_id, bat_id)] = Decimal(str(stock.quantity)) if stock else Decimal('0')
         
         # Lock Surplus
         surplus = db.session.query(Surplus).filter_by(
@@ -196,7 +244,7 @@ def approve_group(group_id: int, actor_user_id: int, note: Optional[str] = None)
             batch_id=bat_id
         ).with_for_update().first()
         
-        locked_surplus[(art_id, bat_id)] = Decimal(str(surplus.quantity_kg)) if surplus else Decimal('0')
+        locked_surplus[(art_id, bat_id)] = Decimal(str(surplus.quantity)) if surplus else Decimal('0')
         
     # 4. Availability Validation (Pre-check)
     for (art_id, bat_id), requirements in needs.items():

@@ -1,5 +1,12 @@
 # Weekly Status Report - YYYY-MM-DD
 
+> [!NOTE]
+> This template is for historical reporting.
+> Active policy/implementation direction is defined in:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - active task brief(s), currently `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 **Week**: DD MMM - DD MMM YYYY  
 **Reported by**: Orchestrator  
 **Date**: YYYY-MM-DD

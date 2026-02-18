@@ -58,7 +58,7 @@ nano .env
 Required variables:
 - `DATABASE_URL` - PostgreSQL connection string
 - `JWT_SECRET_KEY` - Secret for JWT tokens (generate random string)
-- `API_TOKEN` - API access token
+- `API_TOKEN` - legacy compatibility variable (optional in JWT flow)
 
 ### 5. Initialize Database
 
@@ -101,7 +101,6 @@ Edit `desktop-ui/.env` (or create if missing):
 
 ```
 VITE_API_URL=http://localhost:5001
-VITE_API_TOKEN=your_api_token_from_backend_env
 ```
 
 ### 4. Start Desktop UI
@@ -228,7 +227,7 @@ kill -9 <PID>
 ### Backend Health Check
 
 ```bash
-curl http://localhost:5001/api/health
+curl http://localhost:5001/health
 ```
 
 Expected response:
@@ -304,4 +303,4 @@ Documentation:
 
 ---
 
-Last Updated: 2026-02-04
+Last Updated: 2026-02-17

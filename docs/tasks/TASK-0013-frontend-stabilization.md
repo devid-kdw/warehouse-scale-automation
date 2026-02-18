@@ -1,3 +1,11 @@
+> [!IMPORTANT]
+> **Historical Snapshot Notice**
+> This task brief documents earlier implementation phases and may contain superseded assumptions.
+> Active direction is defined by:
+> - `docs/team/RULES_OF_ENGAGEMENT.md`
+> - `docs/team/DECISIONS.md`
+> - `docs/tasks/TASK-0020-ui-feedback-master-plan-input.md`
+
 # TASK-0013: Frontend Stabilization (P0/P1)
 
 **Goal**: Expose Bulk Entry, enforce guards, and clean up usage of legacy settings. "Bulk Entry is available."
